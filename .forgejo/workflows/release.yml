@@ -27,14 +27,14 @@ jobs:
         uses: https://codeberg.org/umglurf/buildah-action@main
         with:
           cache: true
-          cache_repo: codeberg.org/${{ github.repository }}/cache
+          cache_repo: codeberg.org/${{ github.repository_owner }}/clearload/cache
           container_file: ./Dockerfile
           credentials: |
             codeberg.org=${{ github.actor }}:${{ secrets.GITHUB_TOKEN }}
             docker.io=${{ secrets.DOCKERHUB_USERNAME }}:${{ secrets.DOCKERHUB_TOKEN }}
           destinations: |
-            codeberg.org/${{ github.repository }}:${{ github.ref_name }}
-            codeberg.org/${{ github.repository }}:latest
+            codeberg.org/${{ github.repository_owner }}/clearload:${{ github.ref_name }}
+            codeberg.org/${{ github.repository_owner }}/clearload:latest
             docker.io/${{ secrets.DOCKERHUB_USERNAME }}/clearload:${{ github.ref_name }}
             docker.io/${{ secrets.DOCKERHUB_USERNAME }}/clearload:latest
           push: true
