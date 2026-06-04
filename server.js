@@ -155,8 +155,13 @@ const apiSecurityGuard = (req, res, next) => {
   });
 };
 
-// Apply security guard to all API routes
-app.use('/api', apiSecurityGuard);
+// Apply security guard to all API routes (except /api/status which is public)
+app.use('/api', (req, res, next) => {
+  if (req.path === '/status') {
+    return next();
+  }
+  apiSecurityGuard(req, res, next);
+});
 
 // 3. Rate Limiter Middleware for scan route
 const limitWindowSec = parseInt(process.env.RATE_LIMIT_WINDOW_SEC, 10) || 900;
