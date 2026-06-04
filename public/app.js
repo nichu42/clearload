@@ -973,34 +973,34 @@ document.addEventListener('DOMContentLoaded', () => {
         let warnHTML = '';
         if (ch.id === 'cookie_security') {
           if (item.category === 'Unknown' && item.securityIssues && item.securityIssues.length > 0) {
-            warnHTML = `<span class="sec-warn" style="color: var(--warning); border: 1px solid rgba(245, 158, 11, 0.2); background: rgba(245, 158, 11, 0.1);"><i class="fa-solid fa-triangle-exclamation"></i> Insecure &amp; Unknown</span>`;
+            warnHTML = `<span class="sec-warn warn"><i class="fa-solid fa-triangle-exclamation"></i> Insecure &amp; Unknown</span>`;
           } else if (item.category === 'Unknown') {
-            warnHTML = `<span class="sec-warn" style="color: var(--warning); border: 1px solid rgba(245, 158, 11, 0.2); background: rgba(245, 158, 11, 0.1);"><i class="fa-solid fa-circle-question"></i> Unknown</span>`;
+            warnHTML = `<span class="sec-warn warn"><i class="fa-solid fa-circle-question"></i> Unknown</span>`;
           } else if (item.securityIssues && item.securityIssues.length > 0) {
-            warnHTML = `<span class="sec-warn" style="color: var(--warning); border: 1px solid rgba(245, 158, 11, 0.2); background: rgba(245, 158, 11, 0.1);"><i class="fa-solid fa-triangle-exclamation"></i> Insecure Flag</span>`;
+            warnHTML = `<span class="sec-warn warn"><i class="fa-solid fa-triangle-exclamation"></i> Insecure Flag</span>`;
           }
         } else if (ch.id === 'browser_storage') {
           if (item.category === 'Marketing/Advertising' || item.category === 'Analytics') {
-            warnHTML = `<span class="sec-warn font-bold" style="color: var(--error); border: 1px solid rgba(239, 68, 68, 0.2); background: rgba(239, 68, 68, 0.1);"><i class="fa-solid fa-circle-xmark"></i> Non-Compliant</span>`;
+            warnHTML = `<span class="sec-warn font-bold fail"><i class="fa-solid fa-circle-xmark"></i> Non-Compliant</span>`;
           } else if (item.category === 'Unknown') {
-            warnHTML = `<span class="sec-warn font-bold" style="color: var(--warning); border: 1px solid rgba(245, 158, 11, 0.2); background: rgba(245, 158, 11, 0.1);"><i class="fa-solid fa-circle-question"></i> Unknown</span>`;
+            warnHTML = `<span class="sec-warn font-bold warn"><i class="fa-solid fa-circle-question"></i> Unknown</span>`;
           }
         } else if (ch.id === 'ssl_tls') {
           if (item.isViolation) {
-            warnHTML = `<span class="sec-warn font-bold" style="color: var(--error); border: 1px solid rgba(239, 68, 68, 0.2); background: rgba(239, 68, 68, 0.1);"><i class="fa-solid fa-circle-xmark"></i> Critical</span>`;
+            warnHTML = `<span class="sec-warn font-bold fail"><i class="fa-solid fa-circle-xmark"></i> Critical</span>`;
           } else if (item.isInfo) {
             if (item.badgeStatus === 'secure') {
-              warnHTML = `<span class="sec-warn font-bold" style="color: var(--success); border: 1px solid rgba(16, 185, 129, 0.2); background: rgba(16, 185, 129, 0.1);"><i class="fa-solid fa-circle-check"></i> ${item.badgeText}</span>`;
+              warnHTML = `<span class="sec-warn font-bold pass"><i class="fa-solid fa-circle-check"></i> ${item.badgeText}</span>`;
             } else if (item.badgeStatus === 'info') {
-              warnHTML = `<span class="sec-warn font-bold" style="color: var(--info); border: 1px solid rgba(59, 130, 246, 0.2); background: rgba(59, 130, 246, 0.1);"><i class="fa-solid fa-circle-info"></i> ${item.badgeText}</span>`;
+              warnHTML = `<span class="sec-warn font-bold info"><i class="fa-solid fa-circle-info"></i> ${item.badgeText}</span>`;
             } else {
-              warnHTML = `<span class="sec-warn font-bold" style="color: var(--text-secondary); border: 1px solid var(--panel-border); background: rgba(255, 255, 255, 0.05);"><i class="fa-solid fa-circle-minus"></i> ${item.badgeText}</span>`;
+              warnHTML = `<span class="sec-warn font-bold neutral"><i class="fa-solid fa-circle-minus"></i> ${item.badgeText}</span>`;
             }
           } else {
-            warnHTML = `<span class="sec-warn font-bold" style="color: var(--warning); border: 1px solid rgba(245, 158, 11, 0.2); background: rgba(245, 158, 11, 0.1);"><i class="fa-solid fa-triangle-exclamation"></i> Warning</span>`;
+            warnHTML = `<span class="sec-warn font-bold warn"><i class="fa-solid fa-triangle-exclamation"></i> Warning</span>`;
           }
         } else if (ch.id === 'marketing_cookies' || ch.id === 'analytics_cookies' || ch.id === 'outbound_trackers' || ch.id === 'third_party_hosts' || ch.id === 'embedded_widgets') {
-          warnHTML = `<span class="sec-warn font-bold" style="color: var(--error); border: 1px solid rgba(239, 68, 68, 0.2); background: rgba(239, 68, 68, 0.1);"><i class="fa-solid fa-circle-xmark"></i> Non-Compliant</span>`;
+          warnHTML = `<span class="sec-warn font-bold fail"><i class="fa-solid fa-circle-xmark"></i> Non-Compliant</span>`;
         }
 
         let detailsHTML = '';
@@ -1017,7 +1017,7 @@ document.addEventListener('DOMContentLoaded', () => {
             shortUrl = shortUrl.substring(0, 87) + '...';
           }
           
-          detailsHTML = `${typeLabel} | Sample URL: <span class="font-mono" style="color: var(--text-secondary);">${escapeHtml(shortUrl)}</span>`;
+          detailsHTML = `${typeLabel} | Sample URL: <span class="font-mono text-secondary">${escapeHtml(shortUrl)}</span>`;
           bubbleTitle = item.sampleRequest.url;
         } else {
           let rawDetails = details;
@@ -1033,20 +1033,20 @@ document.addEventListener('DOMContentLoaded', () => {
         if ((ch.id === 'outbound_trackers' || ch.id === 'third_party_hosts') && item.requests && item.requests.length > 0) {
           isExpandable = true;
           incidentsHTML = `
-            <div class="incidents-list hidden" style="margin-top: 0.6rem; padding-top: 0.6rem; border-top: 1px solid rgba(255, 255, 255, 0.05); display: flex; flex-direction: column; gap: 0.4rem; width: 100%;">
+            <div class="incidents-list hidden">
               ${item.requests.map((req, idx) => {
                 let reqUrl = req.url;
                 return `
-                  <div class="incident-row" style="display: flex; align-items: flex-start; justify-content: space-between; gap: 0.5rem; font-size: 0.72rem; padding: 0.25rem 0; width: 100%; border-bottom: ${idx < item.requests.length - 1 ? '1px dashed rgba(255, 255, 255, 0.03)' : 'none'}; word-break: break-all;">
-                    <div style="display: flex; flex-direction: column; gap: 0.15rem; flex-grow: 1; min-width: 0;">
-                      <span class="font-mono" style="color: var(--text-primary); word-break: break-all;">
-                        <span style="color: var(--text-muted); margin-right: 0.3rem;">[${idx + 1}]</span>
-                        <a href="${escapeHtml(reqUrl)}" target="_blank" rel="noopener noreferrer" style="color: var(--accent-color); text-decoration: none;" class="incident-url">${escapeHtml(reqUrl)}</a>
+                  <div class="incident-row">
+                    <div class="incident-info">
+                      <span class="font-mono">
+                        <span class="incident-number">[${idx + 1}]</span>
+                        <a href="${escapeHtml(reqUrl)}" target="_blank" rel="noopener noreferrer" class="incident-url">${escapeHtml(reqUrl)}</a>
                       </span>
                     </div>
-                    <div style="display: flex; align-items: center; gap: 0.35rem; flex-shrink: 0;">
-                      <span class="font-mono" style="color: var(--text-muted); font-size: 0.68rem; text-transform: uppercase;">${escapeHtml(req.method)}</span>
-                      <span class="type-tooltip" title="${escapeHtml(TYPE_EXPLANATIONS[req.resourceType.toUpperCase()] || 'External connection request')}" style="font-size: 0.68rem; font-weight: 600; text-transform: uppercase; background: rgba(255, 255, 255, 0.05); padding: 0.1rem 0.3rem; border-radius: 3px;">${escapeHtml(req.resourceType)}</span>
+                    <div class="incident-meta">
+                      <span class="font-mono incident-method">${escapeHtml(req.method)}</span>
+                      <span class="type-tooltip incident-type-tag" title="${escapeHtml(TYPE_EXPLANATIONS[req.resourceType.toUpperCase()] || 'External connection request')}">${escapeHtml(req.resourceType)}</span>
                     </div>
                   </div>
                 `;
@@ -1058,14 +1058,14 @@ document.addEventListener('DOMContentLoaded', () => {
         if (isExpandable) {
           return `
             <div class="detail-item-bubble expandable" data-ch-id="${ch.id}" title="${escapeHtml(bubbleTitle)}">
-              <div class="bubble-header" style="display: flex; justify-content: space-between; align-items: center; gap: 0.5rem; width: 100%;">
+              <div class="bubble-header">
                 <div>
                   <strong>${escapeHtml(name)}</strong>
-                  <div style="font-size: 0.72rem; color: var(--text-secondary); margin-top: 0.15rem;">${detailsHTML}</div>
+                  <div class="bubble-details">${detailsHTML}</div>
                 </div>
-                <div style="display: flex; align-items: center; gap: 0.6rem; flex-shrink: 0;">
+                <div class="bubble-actions">
                   ${warnHTML}
-                  <i class="fa-solid fa-chevron-right toggle-icon" style="color: var(--text-muted); font-size: 0.75rem; transition: transform 0.2s ease;"></i>
+                  <i class="fa-solid fa-chevron-right toggle-icon"></i>
                 </div>
               </div>
               ${incidentsHTML}
@@ -1076,7 +1076,7 @@ document.addEventListener('DOMContentLoaded', () => {
             <div class="detail-item-bubble" title="${escapeHtml(bubbleTitle)}">
               <div>
                 <strong>${escapeHtml(name)}</strong>
-                <div style="font-size: 0.72rem; color: var(--text-secondary); margin-top: 0.15rem;">${detailsHTML}</div>
+                <div class="bubble-details">${detailsHTML}</div>
               </div>
               ${warnHTML}
             </div>
@@ -1091,16 +1091,13 @@ document.addEventListener('DOMContentLoaded', () => {
         
         let storageHTML = '';
         if (nonCompliantItems.length > 0) {
-          storageHTML += `<div style="font-weight: 700; font-size: 0.78rem; color: var(--error); margin-bottom: 0.5rem; text-transform: uppercase; letter-spacing: 0.5px; display: flex; align-items: center; gap: 0.4rem;"><i class="fa-solid fa-circle-xmark"></i> Non-Compliant Keys (Consent Required)</div>`;
+          storageHTML += `<div class="findings-subheading fail"><i class="fa-solid fa-circle-xmark"></i> Non-Compliant Keys (Consent Required)</div>`;
           nonCompliantItems.forEach(item => {
             storageHTML += renderSingleItemBubble(ch, item);
           });
         }
         if (unknownItems.length > 0) {
-          if (nonCompliantItems.length > 0) {
-            storageHTML += `<div style="margin-top: 1.25rem;"></div>`;
-          }
-          storageHTML += `<div style="font-weight: 700; font-size: 0.78rem; color: var(--warning); margin-bottom: 0.5rem; text-transform: uppercase; letter-spacing: 0.5px; display: flex; align-items: center; gap: 0.4rem;"><i class="fa-solid fa-circle-question"></i> Unknown Keys (Needs Verification)</div>`;
+          storageHTML += `<div class="findings-subheading warn"><i class="fa-solid fa-circle-question"></i> Unknown Keys (Needs Verification)</div>`;
           unknownItems.forEach(item => {
             storageHTML += renderSingleItemBubble(ch, item);
           });
@@ -1112,16 +1109,13 @@ document.addEventListener('DOMContentLoaded', () => {
         
         let cookieHTML = '';
         if (unknownItems.length > 0) {
-          cookieHTML += `<div style="font-weight: 700; font-size: 0.78rem; color: var(--warning); margin-bottom: 0.5rem; text-transform: uppercase; letter-spacing: 0.5px; display: flex; align-items: center; gap: 0.4rem;"><i class="fa-solid fa-circle-question"></i> Unknown Cookies (Needs Verification)</div>`;
+          cookieHTML += `<div class="findings-subheading warn"><i class="fa-solid fa-circle-question"></i> Unknown Cookies (Needs Verification)</div>`;
           unknownItems.forEach(item => {
             cookieHTML += renderSingleItemBubble(ch, item);
           });
         }
         if (insecureItems.length > 0) {
-          if (unknownItems.length > 0) {
-            cookieHTML += `<div style="margin-top: 1.25rem;"></div>`;
-          }
-          cookieHTML += `<div style="font-weight: 700; font-size: 0.78rem; color: var(--warning); margin-bottom: 0.5rem; text-transform: uppercase; letter-spacing: 0.5px; display: flex; align-items: center; gap: 0.4rem;"><i class="fa-solid fa-triangle-exclamation"></i> Insecure Cookie Flags (Warnings)</div>`;
+          cookieHTML += `<div class="findings-subheading warn"><i class="fa-solid fa-triangle-exclamation"></i> Insecure Cookie Flags (Warnings)</div>`;
           insecureItems.forEach(item => {
             cookieHTML += renderSingleItemBubble(ch, item);
           });
@@ -1146,8 +1140,8 @@ document.addEventListener('DOMContentLoaded', () => {
       let guideButtonHTML = '';
       if (ch.id === 'cookie_security' || ch.id === 'browser_storage') {
         guideButtonHTML = `
-          <button id="openGuideModalBtn" class="secondary-btn" style="margin-top: -0.5rem; margin-bottom: 1.25rem; width: 100%; display: flex; align-items: center; justify-content: center; gap: 0.5rem; font-size: 0.85rem; padding: 0.6rem;">
-            <i class="fa-solid fa-circle-question" style="color: var(--accent-color);"></i>
+          <button id="openGuideModalBtn" class="secondary-btn guide-trigger-btn">
+            <i class="fa-solid fa-circle-question"></i>
             Guide: What are Legitimate Cookies &amp; GDPR Rules?
           </button>
         `;

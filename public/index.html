@@ -121,7 +121,7 @@
         
         <!-- Quick Overview Row -->
         <!-- Binary Compliance Card (Full Width Banner) -->
-        <div class="glass-card compliance-status-card" id="complianceCard" style="margin-bottom: 1.5rem;">
+        <div class="glass-card compliance-status-card" id="complianceCard">
           <div class="compliance-layout-split">
             <div class="compliance-left">
               <h3>GDPR Compliance Status</h3>
@@ -132,12 +132,12 @@
                 </div>
               </div>
               <p class="status-explanation" id="statusExplanation">This website meets all audited GDPR & ePrivacy compliance standards.</p>
-              <div id="redirectInfoContainer" class="hidden" style="margin-top: 0.75rem; font-size: 0.82rem; display: flex; align-items: center; gap: 0.5rem; color: var(--text-primary); background: rgba(59, 130, 246, 0.08); border: 1px solid rgba(59, 130, 246, 0.2); padding: 0.55rem 0.85rem; border-radius: 8px; line-height: 1.4;">
-                <i class="fa-solid fa-circle-info" style="color: var(--info); font-size: 1rem; flex-shrink: 0;"></i>
+              <div id="redirectInfoContainer" class="banner-panel info hidden">
+                <i class="fa-solid fa-circle-info info-icon"></i>
                 <span id="redirectInfoText"></span>
               </div>
-              <div id="httpInfoContainer" class="hidden" style="margin-top: 0.75rem; font-size: 0.82rem; display: flex; align-items: center; gap: 0.5rem; color: var(--text-primary); background: var(--warning-bg); border: 1px solid rgba(245, 158, 11, 0.2); padding: 0.55rem 0.85rem; border-radius: 8px; line-height: 1.4;">
-                <i class="fa-solid fa-triangle-exclamation" style="color: var(--warning); font-size: 1rem; flex-shrink: 0;"></i>
+              <div id="httpInfoContainer" class="banner-panel warning hidden">
+                <i class="fa-solid fa-triangle-exclamation warn-icon"></i>
                 <span id="httpInfoText"></span>
               </div>
             </div>
@@ -286,23 +286,22 @@
     <!-- Footer -->
     <footer>
       <p>
-        ClearLoad <span id="appVersion"></span> &bull; <a href="#" id="openCreditsBtn" style="color: var(--accent-color); text-decoration: none; font-weight: 500; transition: var(--transition-smooth);">About &amp; Credits</a> &bull; <a href="#" id="openDisclaimerBtn" style="color: var(--accent-color); text-decoration: none; font-weight: 500; transition: var(--transition-smooth);">Disclaimer</a> &bull; <a href="#" id="openLicenseBtn" style="color: var(--accent-color); text-decoration: none; font-weight: 500; transition: var(--transition-smooth);">License</a> &bull; <a href="#" id="openDictsBtn" style="color: var(--accent-color); text-decoration: none; font-weight: 500; transition: var(--transition-smooth);">Dictionaries</a>
+        ClearLoad <span id="appVersion"></span> &bull; <a href="#" id="openCreditsBtn">About &amp; Credits</a> &bull; <a href="#" id="openDisclaimerBtn">Disclaimer</a> &bull; <a href="#" id="openLicenseBtn">License</a> &bull; <a href="#" id="openDictsBtn">Dictionaries</a>
       </p>
       <p id="footerCustomText" class="footer-custom-text"></p>
     </footer>
-  </div>
-  <!-- Legitimate Cookies Guide Modal -->
+    <!-- Legitimate Cookies Guide Modal -->
   <div id="guideModal" class="modal-overlay hidden">
     <div class="glass-card modal-container">
       <div class="modal-header">
-        <h3><i class="fa-solid fa-circle-question" style="color: var(--accent-color); margin-right: 0.5rem;"></i> Legitimate Cookies &amp; GDPR Rules</h3>
+        <h3><i class="fa-solid fa-circle-question"></i> Legitimate Cookies &amp; GDPR Rules</h3>
         <button id="closeGuideModalBtn" class="close-btn" aria-label="Close guide modal"><i class="fa-solid fa-xmark"></i></button>
       </div>
       <div class="modal-body">
         <section class="modal-section">
           <h4>1. What cookies are "Legitimate" (Consent-Exempt)?</h4>
           <p>Under ePrivacy rules (Article 5(3)), cookies/storage keys that are <strong>Strictly Necessary</strong> for the core functions of the website do not require user consent. They must meet one of these criteria:</p>
-          <ul style="margin-top: 0.25rem;">
+          <ul>
             <li><strong>Session State:</strong> Saving items in a shopping cart or form inputs as users browse.</li>
             <li><strong>Security:</strong> Bot detection, spam prevention (e.g. Cloudflare, WAF shields).</li>
             <li><strong>User Settings:</strong> Remembering preferences explicitly chosen by the user (like UI language).</li>
@@ -315,32 +314,32 @@
           <h4>2. Do exempt cookies still need to be declared?</h4>
           <p><strong>Yes.</strong> Even though you don't need consent to place them, GDPR transparency rules (Articles 12-14) require you to declare all cookies running on your site.</p>
         </section>
-
+ 
         <section class="modal-section">
           <h4>3. How and where do I declare them?</h4>
-          <ul style="margin-top: 0.25rem;">
+          <ul>
             <li><strong>Where:</strong> List them in your website's <strong>Cookie/Privacy Policy</strong> (linked in the footer) and inside your <strong>Consent Banner preference center</strong> details drawer.</li>
             <li><strong>What to include:</strong> For every cookie, specify its Name/Key, Provider/Domain, Purpose, Expiry/Duration, and Type.</li>
           </ul>
-          <div style="margin-top: 0.85rem; border: 1px solid var(--panel-border); border-radius: 8px; overflow: hidden; font-size: 0.78rem;">
-            <table style="width: 100%; border-collapse: collapse; text-align: left; background: rgba(0,0,0,0.2);">
+          <div class="modal-table-container">
+            <table class="modal-table">
               <thead>
-                <tr style="border-bottom: 1px solid var(--panel-border); background: rgba(0,0,0,0.2);">
-                  <th style="padding: 0.5rem 0.75rem;">Name</th>
-                  <th style="padding: 0.5rem 0.75rem;">Purpose</th>
-                  <th style="padding: 0.5rem 0.75rem;">Expiry</th>
+                <tr>
+                  <th>Name</th>
+                  <th>Purpose</th>
+                  <th>Expiry</th>
                 </tr>
               </thead>
               <tbody>
-                <tr style="border-bottom: 1px solid var(--panel-border);">
-                  <td style="padding: 0.5rem 0.75rem; font-family: monospace;">wc_cart_hash</td>
-                  <td style="padding: 0.5rem 0.75rem;">Tracks shopping cart items.</td>
-                  <td style="padding: 0.5rem 0.75rem;">Session</td>
+                <tr>
+                  <td class="font-mono">wc_cart_hash</td>
+                  <td>Tracks shopping cart items.</td>
+                  <td>Session</td>
                 </tr>
                 <tr>
-                  <td style="padding: 0.5rem 0.75rem; font-family: monospace; border-bottom: none;">cc_cookie</td>
-                  <td style="padding: 0.5rem 0.75rem; border-bottom: none;">Saves cookie consent choice.</td>
-                  <td style="padding: 0.5rem 0.75rem; border-bottom: none;">365 days</td>
+                  <td class="font-mono">cc_cookie</td>
+                  <td>Saves cookie consent choice.</td>
+                  <td>365 days</td>
                 </tr>
               </tbody>
             </table>
@@ -349,30 +348,31 @@
       </div>
     </div>
   </div>
+</div>
 
   
   
 
   <!-- License Modal -->
   <div id="licenseModal" class="modal-overlay hidden">
-    <div class="glass-card modal-container" style="max-width: 800px; width: 90%;">
+    <div class="glass-card modal-container modal-lg">
       <div class="modal-header">
-        <h3><i class="fa-solid fa-file-contract" style="color: var(--accent-color); margin-right: 0.5rem;"></i> GNU Affero General Public License (AGPL v3)</h3>
+        <h3><i class="fa-solid fa-file-contract"></i> GNU Affero General Public License (AGPL v3)</h3>
         <button id="closeLicenseModalBtn" class="close-btn" aria-label="Close license modal"><i class="fa-solid fa-xmark"></i></button>
       </div>
-      <div class="modal-body" style="max-height: 500px; overflow-y: auto;">
+      <div class="modal-body">
         <!-- App Copyright Card -->
-        <div class="app-copyright-card" style="background: linear-gradient(135deg, rgba(168, 85, 247, 0.12) 0%, rgba(59, 130, 246, 0.04) 100%); border: 1px solid rgba(168, 85, 247, 0.25); border-radius: 8px; padding: 0.85rem 1rem; margin-bottom: 1.25rem; display: flex; align-items: center; justify-content: center; gap: 0.55rem; box-shadow: 0 4px 12px rgba(168, 85, 247, 0.08);">
-          <i class="fa-solid fa-copyright" style="color: var(--accent-color); font-size: 1.05rem;"></i>
-          <span style="font-size: 0.88rem; font-weight: 600; color: var(--text-primary); letter-spacing: 0.01em;">Copyright © 2026 nichu42 and contributors</span>
+        <div class="app-copyright-card">
+          <i class="fa-solid fa-copyright"></i>
+          <span>Copyright © 2026 nichu42 and contributors</span>
         </div>
 
         <!-- License Document Header Card -->
-        <div class="license-header-card" style="background: rgba(255, 255, 255, 0.02); border: 1px solid rgba(255, 255, 255, 0.05); border-radius: 8px; padding: 1rem; margin-bottom: 1.5rem; text-align: center;">
-          <h4 style="margin: 0 0 0.25rem 0; border: none; padding: 0; color: var(--accent-color); font-weight: 800; font-family: var(--font-display);">GNU AFFERO GENERAL PUBLIC LICENSE</h4>
-          <div style="font-size: 0.85rem; font-weight: 600; color: var(--text-secondary); margin-bottom: 0.75rem;">Version 3, 19 November 2007</div>
-          <div style="font-size: 0.78rem; line-height: 1.4; color: var(--text-muted); max-width: 500px; margin: 0 auto;">
-            Copyright © 2007 <a href="http://fsf.org/" target="_blank" rel="noopener noreferrer" style="color: var(--accent-color); text-decoration: none;">Free Software Foundation, Inc.</a><br>
+        <div class="license-header-card">
+          <h4>GNU AFFERO GENERAL PUBLIC LICENSE</h4>
+          <div class="license-version">Version 3, 19 November 2007</div>
+          <div class="license-fsf">
+            Copyright © 2007 <a href="http://fsf.org/" target="_blank" rel="noopener noreferrer">Free Software Foundation, Inc.</a><br>
             Everyone is permitted to copy and distribute verbatim copies of this license document, but changing it is not allowed.
           </div>
         </div>
@@ -494,41 +494,41 @@
 
   <!-- Legal Disclaimer Modal -->
   <div id="disclaimerModal" class="modal-overlay hidden">
-    <div class="glass-card modal-container" style="max-width: 600px; width: 90%;">
+    <div class="glass-card modal-container modal-md">
       <div class="modal-header">
-        <h3><i class="fa-solid fa-scale-balanced" style="color: var(--accent-color); margin-right: 0.5rem;"></i> Legal Disclaimer</h3>
+        <h3><i class="fa-solid fa-scale-balanced"></i> Legal Disclaimer</h3>
         <button id="closeDisclaimerModalBtn" class="close-btn" aria-label="Close disclaimer modal"><i class="fa-solid fa-xmark"></i></button>
       </div>
       <div class="modal-body">
-        <section class="modal-section" style="margin-bottom: 1.25rem;">
-          <h4 style="color: var(--error); margin-bottom: 0.5rem; display: flex; align-items: center; gap: 0.4rem;">
+        <section class="modal-section">
+          <h4 class="error-title">
             <i class="fa-solid fa-triangle-exclamation"></i> No Legal Advice
           </h4>
-          <p style="font-size: 0.88rem; line-height: 1.6; color: var(--text-primary);">
+          <p class="highlight">
             ClearLoad is an automated technical diagnostic tool designed for testing public website assets. <strong>It does not provide legal advice, legal counsel, or formal compliance certifications.</strong> Use of this tool does not create an attorney-client relationship.
           </p>
         </section>
-        <section class="modal-section" style="margin-bottom: 1.25rem;">
+        <section class="modal-section">
           <h4>Limitations of Automated Audits</h4>
-          <p style="font-size: 0.88rem; line-height: 1.6; color: var(--text-secondary);">
+          <p>
             Compliance with regulations such as the General Data Protection Regulation (GDPR) and the ePrivacy Directive depends on numerous factors, including your privacy policy text, user consent histories, data processing agreements, and overall data handling workflows. Automated tools can only check technical aspects visible on initial page load and cannot evaluate your complete legal compliance framework.
           </p>
         </section>
-        <section class="modal-section" style="margin-bottom: 1.25rem;">
+        <section class="modal-section">
           <h4>No Warranty &amp; Liability Limitation</h4>
-          <p style="font-size: 0.88rem; line-height: 1.6; color: var(--text-secondary);">
+          <p>
             This tool is provided "as is" without any warranty of any kind, either express or implied, including but not limited to warranties of accuracy, completeness, or fitness for a particular purpose. Under no circumstances shall the authors, contributors, or copyright holders be liable for any claims, damages, or other liability arising from your use of or reliance on the tool's findings.
           </p>
         </section>
-        <section class="modal-section" style="margin-bottom: 1.25rem;">
+        <section class="modal-section">
           <h4>Privacy &amp; Data Processing</h4>
-          <p style="font-size: 0.88rem; line-height: 1.6; color: var(--text-secondary);">
+          <p>
             ClearLoad operates as a fully stateless service. We do not store search history, audit reports, or visitor details in any database or file on disk. To prevent service abuse and protect resources, we process client IP addresses transiently in-memory (RAM) for rate limiting. This security data is automatically discarded after 15 minutes and is never logged to disk or shared with third parties.
           </p>
         </section>
-        <section class="modal-section" style="margin-bottom: 0.5rem;">
+        <section class="modal-section">
           <h4>User Responsibility</h4>
-          <p style="font-size: 0.88rem; line-height: 1.6; color: var(--text-secondary);">
+          <p>
             You are solely responsible for verifying the accuracy of the audit results and ensuring your website meets all applicable legal requirements. We strongly recommend consulting with a qualified legal professional to address your specific compliance needs.
           </p>
         </section>
@@ -539,72 +539,72 @@
   <div id="creditsModal" class="modal-overlay hidden">
     <div class="glass-card modal-container">
       <div class="modal-header">
-        <h3><i class="fa-solid fa-circle-info" style="color: var(--accent-color); margin-right: 0.5rem;"></i> About ClearLoad &amp; Credits</h3>
+        <h3><i class="fa-solid fa-circle-info"></i> About ClearLoad &amp; Credits</h3>
         <button id="closeCreditsModalBtn" class="close-btn" aria-label="Close credits modal"><i class="fa-solid fa-xmark"></i></button>
       </div>
       <div class="modal-body">
         <section class="modal-section">
           <h4>About ClearLoad</h4>
           <p>ClearLoad is an on-demand website privacy, cookie, and security compliance auditor. It runs on a fully stateless, in-memory architecture to scan and diagnose GDPR and ePrivacy risks on initial page load. All frontend assets (including fonts and icons) are self-hosted locally to guarantee zero external pre-consent connections.</p>
-          <p style="margin-top: 0.75rem; font-size: 0.85rem; line-height: 1.6;">
+          <p>
             <strong>Version:</strong> <span id="creditsVersion"></span><br>
-            <strong>Project Home:</strong> <a href="https://codeberg.org/nichu42/ClearLoad" target="_blank" rel="noopener noreferrer" style="color: var(--accent-color); text-decoration: none; font-weight: 600;">Codeberg Repository</a>
+            <strong>Project Home:</strong> <a href="https://codeberg.org/nichu42/ClearLoad" target="_blank" rel="noopener noreferrer">Codeberg Repository</a>
           </p>
         </section>
         <section class="modal-section">
           <h4>Legal Disclaimer</h4>
-          <p style="font-size: 0.85rem; line-height: 1.5; color: var(--text-secondary);">
-            ClearLoad is a technical diagnostic tool and does <strong>not</strong> provide legal counsel or advice. Results are for informational and educational purposes only. You must independently verify all findings. <a href="#" id="creditsDisclaimerLink" style="color: var(--accent-color); text-decoration: none; font-weight: 600;">Read the full disclaimer.</a>
+          <p>
+            ClearLoad is a technical diagnostic tool and does <strong>not</strong> provide legal counsel or advice. Results are for informational and educational purposes only. You must independently verify all findings. <a href="#" id="creditsDisclaimerLink">Read the full disclaimer.</a>
           </p>
         </section>
         <section class="modal-section">
           <h4>Copyright &amp; License</h4>
-          <p style="font-size: 0.85rem; line-height: 1.5; color: var(--text-secondary);">
+          <p>
             ClearLoad is &copy; 2026 nichu42 and contributors.
           </p>
-          <p style="margin-top: 0.65rem; font-size: 0.82rem; line-height: 1.5; color: var(--text-secondary);">
+          <p>
             This program is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
           </p>
-          <p style="margin-top: 0.5rem; font-size: 0.82rem; line-height: 1.5; color: var(--text-secondary);">
-            This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. <a href="#" id="creditsLicenseDetailsLink" style="color: var(--accent-color); text-decoration: none; font-weight: 600;">See the GNU Affero General Public License for more details.</a>
+          <p>
+            This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. <a href="#" id="creditsLicenseDetailsLink">See the GNU Affero General Public License for more details.</a>
           </p>
         </section>
         
         <section class="modal-section">
           <h4>Open Source Credits</h4>
           <p>This application is powered by the following open-source software and assets:</p>
-          <ul style="margin-top: 0.5rem; list-style: none;">
-            <li style="margin-bottom: 0.55rem;">
-              <strong><a href="https://nodejs.org/" target="_blank" rel="noopener noreferrer" style="color: var(--accent-color); text-decoration: none; font-weight: 600;">Node.js</a></strong> (Runtime) — <span class="badge">MIT License</span><br>
-              <small style="color: var(--text-muted);">JavaScript runtime built on Chrome's V8 engine, executing the backend server code.</small>
+          <ul class="credits-list">
+            <li class="credits-item">
+              <strong><a href="https://nodejs.org/" target="_blank" rel="noopener noreferrer">Node.js</a></strong> (Runtime) — <span class="badge">MIT License</span><br>
+              <small>JavaScript runtime built on Chrome's V8 engine, executing the backend server code.</small>
             </li>
-            <li style="margin-bottom: 0.55rem;">
-              <strong><a href="https://expressjs.com/" target="_blank" rel="noopener noreferrer" style="color: var(--accent-color); text-decoration: none; font-weight: 600;">Express</a></strong> (Backend) — <span class="badge">MIT License</span><br>
-              <small style="color: var(--text-muted);">Fast, unopinionated, minimalist web framework for Node.js.</small>
+            <li class="credits-item">
+              <strong><a href="https://expressjs.com/" target="_blank" rel="noopener noreferrer">Express</a></strong> (Backend) — <span class="badge">MIT License</span><br>
+              <small>Fast, unopinionated, minimalist web framework for Node.js.</small>
             </li>
-            <li style="margin-bottom: 0.55rem;">
-              <strong><a href="https://playwright.dev/" target="_blank" rel="noopener noreferrer" style="color: var(--accent-color); text-decoration: none; font-weight: 600;">Playwright</a></strong> (Browser Automation) — <span class="badge">Apache 2.0 License</span><br>
-              <small style="color: var(--text-muted);">Library to run headless Chromium for real-time page audits.</small>
+            <li class="credits-item">
+              <strong><a href="https://playwright.dev/" target="_blank" rel="noopener noreferrer">Playwright</a></strong> (Browser Automation) — <span class="badge">Apache 2.0 License</span><br>
+              <small>Library to run headless Chromium for real-time page audits.</small>
             </li>
-            <li style="margin-bottom: 0.55rem;">
-              <strong><a href="https://fontawesome.com/" target="_blank" rel="noopener noreferrer" style="color: var(--accent-color); text-decoration: none; font-weight: 600;">FontAwesome</a></strong> (Icons) — <span class="badge">SIL OFL 1.1 / MIT / CC BY 4.0</span><br>
-              <small style="color: var(--text-muted);">Vector icons bundled locally to prevent third-party IP leakage on initial load.</small>
+            <li class="credits-item">
+              <strong><a href="https://fontawesome.com/" target="_blank" rel="noopener noreferrer">FontAwesome</a></strong> (Icons) — <span class="badge">SIL OFL 1.1 / MIT / CC BY 4.0</span><br>
+              <small>Vector icons bundled locally to prevent third-party IP leakage on initial load.</small>
             </li>
-            <li style="margin-bottom: 0.55rem;">
-              <strong><a href="https://github.com/Outfitio/Outfit-Fonts" target="_blank" rel="noopener noreferrer" style="color: var(--accent-color); text-decoration: none; font-weight: 600;">Outfit</a></strong> &amp; <strong><a href="https://github.com/tokotype/PlusJakartaSans" target="_blank" rel="noopener noreferrer" style="color: var(--accent-color); text-decoration: none; font-weight: 600;">Plus Jakarta Sans</a></strong> (Typography) — <span class="badge">SIL OFL 1.1</span><br>
-              <small style="color: var(--text-muted);">Open-source fonts designed by Rodrigo Fuenzalida and Tokotype, hosted locally for GDPR compliance.</small>
+            <li class="credits-item">
+              <strong><a href="https://github.com/Outfitio/Outfit-Fonts" target="_blank" rel="noopener noreferrer">Outfit</a></strong> &amp; <strong><a href="https://github.com/tokotype/PlusJakartaSans" target="_blank" rel="noopener noreferrer">Plus Jakarta Sans</a></strong> (Typography) — <span class="badge">SIL OFL 1.1</span><br>
+              <small>Open-source fonts designed by Rodrigo Fuenzalida and Tokotype, hosted locally for GDPR compliance.</small>
             </li>
-            <li style="margin-bottom: 0.55rem;">
-              <strong><a href="https://github.com/express-rate-limit/express-rate-limit" target="_blank" rel="noopener noreferrer" style="color: var(--accent-color); text-decoration: none; font-weight: 600;">express-rate-limit</a></strong> (Security) — <span class="badge">MIT License</span><br>
-              <small style="color: var(--text-muted);">Rate-limiting middleware for Express to prevent abuse and DoS attacks.</small>
+            <li class="credits-item">
+              <strong><a href="https://github.com/express-rate-limit/express-rate-limit" target="_blank" rel="noopener noreferrer">express-rate-limit</a></strong> (Security) — <span class="badge">MIT License</span><br>
+              <small>Rate-limiting middleware for Express to prevent abuse and DoS attacks.</small>
             </li>
-            <li style="margin-bottom: 0.55rem;">
-              <strong><a href="https://helmetjs.github.io/" target="_blank" rel="noopener noreferrer" style="color: var(--accent-color); text-decoration: none; font-weight: 600;">Helmet</a></strong> (Security) — <span class="badge">MIT License</span><br>
-              <small style="color: var(--text-muted);">Security middleware that sets HTTP headers to protect against common web vulnerabilities.</small>
+            <li class="credits-item">
+              <strong><a href="https://helmetjs.github.io/" target="_blank" rel="noopener noreferrer">Helmet</a></strong> (Security) — <span class="badge">MIT License</span><br>
+              <small>Security middleware that sets HTTP headers to protect against common web vulnerabilities.</small>
             </li>
-            <li style="margin-bottom: 0.55rem;">
-              <strong><a href="https://github.com/sindresorhus/open" target="_blank" rel="noopener noreferrer" style="color: var(--accent-color); text-decoration: none; font-weight: 600;">open</a></strong> (Utility) — <span class="badge">MIT License</span><br>
-              <small style="color: var(--text-muted);">Cross-platform utility to open URLs in the default browser safely.</small>
+            <li class="credits-item">
+              <strong><a href="https://github.com/sindresorhus/open" target="_blank" rel="noopener noreferrer">open</a></strong> (Utility) — <span class="badge">MIT License</span><br>
+              <small>Cross-platform utility to open URLs in the default browser safely.</small>
             </li>
           </ul>
         </section>
@@ -613,28 +613,28 @@
   </div>
   <!-- Dictionaries Browser Modal -->
   <div id="dictsModal" class="modal-overlay hidden">
-    <div class="glass-card modal-container" style="max-width: 800px; width: 90%;">
+    <div class="glass-card modal-container modal-lg">
       <div class="modal-header">
-        <h3><i class="fa-solid fa-book" style="color: var(--accent-color); margin-right: 0.5rem;"></i> Crowdsourced Classification Dictionaries</h3>
+        <h3><i class="fa-solid fa-book"></i> Crowdsourced Classification Dictionaries</h3>
         <button id="closeDictsModalBtn" class="close-btn" aria-label="Close dictionaries modal"><i class="fa-solid fa-xmark"></i></button>
       </div>
-      <div class="modal-body" style="padding-top: 0.5rem;">
+      <div class="modal-body">
         
         <!-- Explanation & Contribution Info -->
-        <section class="modal-section" style="margin-bottom: 1.25rem; border-bottom: 1px solid var(--panel-border); padding-bottom: 1rem;">
-          <p style="font-size: 0.88rem; line-height: 1.5; color: var(--text-secondary); margin-bottom: 0.75rem;">
+        <section class="modal-section divider">
+          <p>
             ClearLoad uses open-source, crowdsourced classification dictionaries to identify consent management platforms, analytics trackers, cookies, widgets, and fallback classification heuristics on page load.
           </p>
           
-          <div style="background: rgba(147, 51, 234, 0.06); border: 1px solid rgba(147, 51, 234, 0.2); border-radius: 8px; padding: 0.75rem 1rem; font-size: 0.82rem; line-height: 1.5; color: var(--text-primary);">
-            <h5 style="color: var(--accent-color); font-weight: 600; font-family: var(--font-display); margin-bottom: 0.35rem; display: flex; align-items: center; gap: 0.4rem;">
+          <div class="modal-info-box">
+            <h5>
               <i class="fa-solid fa-code-branch"></i> How to Contribute Classifications
             </h5>
-            <p style="margin-bottom: 0.5rem; color: var(--text-secondary);">
+            <p>
               If you identify an unclassified cookie, tracker, CDN, or classification rule, you can help make ClearLoad smarter by contributing directly:
             </p>
-            <ol style="margin-left: 1.25rem; color: var(--text-secondary); display: flex; flex-direction: column; gap: 0.25rem;">
-              <li>Visit the <strong><a href="https://codeberg.org/nichu42/ClearLoad/src/branch/main/dictionaries" target="_blank" rel="noopener noreferrer" style="color: var(--accent-color); text-decoration: none; font-weight: 600;">Codeberg Dictionaries Folder</a></strong>.</li>
+            <ol>
+              <li>Visit the <strong><a href="https://codeberg.org/nichu42/ClearLoad/src/branch/main/dictionaries" target="_blank" rel="noopener noreferrer">Codeberg Dictionaries Folder</a></strong>.</li>
               <li>Edit the appropriate JSON file (<code>cmp_mapping.json</code>, <code>tracking_patterns.json</code>, <code>public_cdns.json</code>, <code>cookie_definitions.json</code>, <code>widget_mappings.json</code>, or <code>classification_rules.json</code>).</li>
               <li>Insert your domain, cookie name, or matching pattern rule <strong>alphabetically</strong>, and maintain correct JSON formatting.</li>
               <li>Save and submit a Pull Request. Once approved, the changes will deploy automatically!</li>
@@ -642,50 +642,50 @@
           </div>
         </section>
         <!-- Search Control -->
-        <div class="table-controls" style="margin-bottom: 1rem;">
-          <div class="filter-search" style="max-width: 100%;">
+        <div class="table-controls">
+          <div class="filter-search">
             <i class="fa-solid fa-magnifying-glass"></i>
             <input type="text" id="dictSearchInput" placeholder="Search dictionary entries by domain or platform...">
           </div>
         </div>
         <!-- Dictionary Switcher Tabs -->
-        <div class="tab-nav" id="dictTabNav" style="margin-bottom: 1rem; display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; background: var(--panel-border); border-radius: 8px; overflow: hidden; border: 1px solid var(--panel-border);">
-          <button class="tab-btn active" data-dict-tab="tracking" style="padding: 0.8rem 0.5rem; justify-content: center; font-size: 0.82rem; background: rgba(0, 0, 0, 0.2); border: none; border-radius: 0;">
-            <i class="fa-solid fa-user-secret"></i> Trackers <span class="badge" id="dictTrackingCount" style="margin-left: 0.25rem;">0</span>
+        <div class="dict-tab-nav" id="dictTabNav">
+          <button class="tab-btn active" data-dict-tab="tracking">
+            <i class="fa-solid fa-user-secret"></i> Trackers <span class="badge" id="dictTrackingCount">0</span>
           </button>
-          <button class="tab-btn" data-dict-tab="widget" style="padding: 0.8rem 0.5rem; justify-content: center; font-size: 0.82rem; background: rgba(0, 0, 0, 0.2); border: none; border-radius: 0;">
-            <i class="fa-solid fa-puzzle-piece"></i> Widgets <span class="badge" id="dictWidgetCount" style="margin-left: 0.25rem;">0</span>
+          <button class="tab-btn" data-dict-tab="widget">
+            <i class="fa-solid fa-puzzle-piece"></i> Widgets <span class="badge" id="dictWidgetCount">0</span>
           </button>
-          <button class="tab-btn" data-dict-tab="cdn" style="padding: 0.8rem 0.5rem; justify-content: center; font-size: 0.82rem; background: rgba(0, 0, 0, 0.2); border: none; border-radius: 0;">
-            <i class="fa-solid fa-globe"></i> Public CDNs <span class="badge" id="dictCdnCount" style="margin-left: 0.25rem;">0</span>
+          <button class="tab-btn" data-dict-tab="cdn">
+            <i class="fa-solid fa-globe"></i> Public CDNs <span class="badge" id="dictCdnCount">0</span>
           </button>
-          <button class="tab-btn" data-dict-tab="cmp" style="padding: 0.8rem 0.5rem; justify-content: center; font-size: 0.82rem; background: rgba(0, 0, 0, 0.2); border: none; border-radius: 0;">
-            <i class="fa-solid fa-user-shield"></i> Consent CMPs <span class="badge" id="dictCmpCount" style="margin-left: 0.25rem;">0</span>
+          <button class="tab-btn" data-dict-tab="cmp">
+            <i class="fa-solid fa-user-shield"></i> Consent CMPs <span class="badge" id="dictCmpCount">0</span>
           </button>
-          <button class="tab-btn" data-dict-tab="cookie" style="padding: 0.8rem 0.5rem; justify-content: center; font-size: 0.82rem; background: rgba(0, 0, 0, 0.2); border: none; border-radius: 0;">
-            <i class="fa-solid fa-cookie"></i> Cookies <span class="badge" id="dictCookieCount" style="margin-left: 0.25rem;">0</span>
+          <button class="tab-btn" data-dict-tab="cookie">
+            <i class="fa-solid fa-cookie"></i> Cookies <span class="badge" id="dictCookieCount">0</span>
           </button>
-          <button class="tab-btn" data-dict-tab="heuristics" style="padding: 0.8rem 0.5rem; justify-content: center; font-size: 0.82rem; background: rgba(0, 0, 0, 0.2); border: none; border-radius: 0;">
-            <i class="fa-solid fa-wand-magic-sparkles"></i> Heuristics <span class="badge" id="dictHeuristicsCount" style="margin-left: 0.25rem;">0</span>
+          <button class="tab-btn" data-dict-tab="heuristics">
+            <i class="fa-solid fa-wand-magic-sparkles"></i> Heuristics <span class="badge" id="dictHeuristicsCount">0</span>
           </button>
         </div>
         <!-- Content Container -->
-        <div id="dictModalContent" class="glass-card" style="padding: 0; min-height: 250px; max-height: 320px; overflow-y: auto; border: 1px solid var(--panel-border); background: rgba(0, 0, 0, 0.15);">
+        <div id="dictModalContent" class="glass-card dict-modal-content">
           
           <!-- Loading State -->
-          <div id="dictLoadingState" class="empty-detail-state" style="padding: 3rem 1rem; min-height: 200px;">
-            <i class="fa-solid fa-circle-notch fa-spin" style="font-size: 2rem; color: var(--accent-color);"></i>
+          <div id="dictLoadingState" class="empty-detail-state dict-empty-state">
+            <i class="fa-solid fa-circle-notch fa-spin"></i>
             <p>Loading dictionaries from server...</p>
           </div>
           <!-- Error State -->
-          <div id="dictErrorState" class="empty-detail-state hidden" style="padding: 3rem 1rem; min-height: 200px; color: var(--error);">
-            <i class="fa-solid fa-triangle-exclamation" style="font-size: 2rem;"></i>
+          <div id="dictErrorState" class="empty-detail-state dict-empty-state hidden">
+            <i class="fa-solid fa-triangle-exclamation"></i>
             <p id="dictErrorMessage">Failed to load dictionaries.</p>
-            <button id="dictRetryBtn" class="secondary-btn" style="margin-top: 0.5rem; font-size: 0.8rem; padding: 0.5rem 1rem;">Retry</button>
+            <button id="dictRetryBtn" class="secondary-btn dict-retry-btn">Retry</button>
           </div>
           <!-- Table Container -->
           <div id="dictDataContainer" class="hidden">
-            <table class="report-table" id="dictTable" style="font-size: 0.82rem;">
+            <table class="report-table" id="dictTable">
               <thead style="position: sticky; top: 0; z-index: 10;">
                 <tr id="dictTableHeader">
                   <!-- Dynamic -->
@@ -696,8 +696,8 @@
               </tbody>
             </table>
             
-            <div id="dictNoResults" class="no-results hidden" style="padding: 3rem 1rem;">
-              <i class="fa-regular fa-folder-open" style="font-size: 2rem; margin-bottom: 0.5rem;"></i>
+            <div id="dictNoResults" class="no-results dict-empty-state hidden">
+              <i class="fa-regular fa-folder-open"></i>
               <p>No matching entries found in this dictionary.</p>
             </div>
           </div>

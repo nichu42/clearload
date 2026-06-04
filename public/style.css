@@ -119,9 +119,16 @@ header {
   font-size: 1.5rem;
   font-weight: 600;
   letter-spacing: -0.5px;
-  text-decoration: none;
-  color: inherit;
+  text-decoration: none !important;
+  color: #ffffff !important;
   cursor: pointer;
+}
+
+.logo:visited,
+.logo:hover,
+.logo:active {
+  color: #ffffff !important;
+  text-decoration: none !important;
 }
 
 .logo-emoji {
@@ -132,7 +139,7 @@ header {
 
 .logo span strong {
   font-weight: 800;
-  color: var(--accent-color);
+  color: var(--accent-color) !important;
 }
 
 .env-badge {
@@ -460,6 +467,7 @@ header {
 .compliance-status-card {
   display: flex;
   flex-direction: column;
+  margin-bottom: 1.5rem;
 }
 
 .compliant-card {
@@ -1044,6 +1052,8 @@ a.url-badge:hover {
 }
 
 .incident-url {
+  color: var(--accent-color);
+  text-decoration: none;
   transition: color 0.15s ease;
 }
 
@@ -1367,6 +1377,8 @@ footer p {
 footer a {
   color: var(--accent-color);
   text-decoration: none;
+  font-weight: 500;
+  transition: var(--transition-smooth);
 }
 
 footer a:visited {
@@ -1554,6 +1566,7 @@ footer a:hover {
   flex-direction: column;
   max-height: 85vh;
   overflow: hidden;
+  padding: 0 !important;
   animation: modalSlideIn 0.3s ease-out forwards;
 }
 
@@ -1579,6 +1592,11 @@ footer a:hover {
   color: var(--text-primary);
   display: flex;
   align-items: center;
+}
+
+.modal-header h3 i {
+  color: var(--accent-color);
+  margin-right: 0.5rem;
 }
 
 .close-btn {
@@ -1627,34 +1645,48 @@ footer a:hover {
 }
 
 .modal-section p {
-  font-size: 0.85rem;
-  margin-bottom: 0.5rem;
+  color: var(--text-secondary);
+  font-size: 0.88rem;
+  line-height: 1.6;
+  margin-bottom: 0.75rem;
+}
+
+.modal-section p.highlight {
+  color: var(--text-primary);
+  font-weight: 500;
+}
+
+.modal-section p:last-child {
+  margin-bottom: 0;
 }
 
 .modal-section ul {
-  font-size: 0.85rem;
+  font-size: 0.88rem;
+  line-height: 1.6;
   margin-top: 0.5rem;
-  margin-bottom: 0.5rem;
+  margin-bottom: 0.75rem;
   padding-left: 1.25rem;
+  color: var(--text-secondary);
 }
 
 .modal-section li {
-  margin-bottom: 0.35rem;
+  margin-bottom: 0.4rem;
 }
 
 .modal-section strong {
   color: var(--text-primary);
 }
 
-/* Custom styling for license modal content */
-#licenseModal .modal-body h3 {
+/* Custom typography & elements for modal body */
+.modal-body h3 {
   font-family: var(--font-display);
   color: var(--text-primary);
   font-weight: 800;
   margin-top: 1rem;
   margin-bottom: 0.5rem;
 }
-#licenseModal .modal-body h4 {
+
+.modal-body h4 {
   font-family: var(--font-display);
   color: var(--accent-color);
   font-weight: 700;
@@ -1663,35 +1695,64 @@ footer a:hover {
   border-bottom: 1px solid var(--panel-border);
   padding-bottom: 0.25rem;
 }
-#licenseModal .modal-body p {
+
+.modal-body h4.error-title {
+  color: var(--error);
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.modal-body p {
   color: var(--text-secondary);
   font-size: 0.88rem;
   line-height: 1.6;
   margin-bottom: 1rem;
 }
-#licenseModal .modal-body ul {
+
+.modal-body p.highlight {
+  color: var(--text-primary);
+  font-weight: 500;
+}
+
+.modal-body ul {
   margin-left: 1.5rem;
   margin-bottom: 1.25rem;
   color: var(--text-secondary);
   font-size: 0.88rem;
   padding-left: 0;
 }
-#licenseModal .modal-body li {
+
+.modal-body li {
   margin-bottom: 0.5rem;
   line-height: 1.5;
 }
-#licenseModal .modal-body a {
+
+.modal-body a {
   color: var(--accent-color);
   text-decoration: none;
   font-weight: 500;
   transition: var(--transition-smooth);
 }
-#licenseModal .modal-body a:visited {
+
+.modal-body a:visited {
   color: var(--accent-color);
 }
-#licenseModal .modal-body a:hover {
+
+.modal-body a:hover {
   text-decoration: underline;
   color: var(--text-primary);
+}
+
+/* Modal Size Modifiers */
+.modal-container.modal-md {
+  max-width: 600px;
+}
+
+.modal-container.modal-lg {
+  max-width: 800px;
 }
 
 @media (max-width: 480px) {
@@ -1755,4 +1816,445 @@ footer a:hover {
   font-weight: 600;
   text-transform: uppercase;
   white-space: nowrap;
+}
+
+/* Dictionary Switcher Navigation */
+.dict-tab-nav {
+  margin-bottom: 1rem;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1px;
+  background: var(--panel-border);
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid var(--panel-border);
+}
+
+.dict-tab-nav .tab-btn {
+  padding: 0.8rem 0.5rem;
+  justify-content: center;
+  font-size: 0.82rem;
+  background: rgba(0, 0, 0, 0.2);
+  border: none;
+  border-radius: 0;
+  transition: var(--transition-smooth);
+}
+
+.dict-tab-nav .tab-btn:hover {
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-primary);
+}
+
+.dict-tab-nav .tab-btn.active {
+  background: rgba(147, 51, 234, 0.15) !important;
+  color: var(--accent-color);
+  font-weight: 700;
+}
+
+@media (max-width: 600px) {
+  .dict-tab-nav {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+/* Layout Banners */
+.banner-panel {
+  margin-top: 0.75rem;
+  font-size: 0.82rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--text-primary);
+  padding: 0.55rem 0.85rem;
+  border-radius: 8px;
+  line-height: 1.4;
+}
+
+.banner-panel.info {
+  background: rgba(59, 130, 246, 0.08);
+  border: 1px solid rgba(59, 130, 246, 0.2);
+}
+
+.banner-panel.warning {
+  background: var(--warning-bg);
+  border: 1px solid rgba(245, 158, 11, 0.2);
+}
+
+.banner-panel i {
+  font-size: 1rem;
+  flex-shrink: 0;
+}
+
+.banner-panel i.info-icon {
+  color: var(--info);
+}
+
+.banner-panel i.warn-icon {
+  color: var(--warning);
+}
+
+/* Dynamic Status Spans (sec-warn) */
+.sec-warn {
+  font-size: 0.75rem;
+  font-family: var(--font-main);
+  font-weight: 500;
+  padding: 0.2rem 0.55rem;
+  border-radius: 6px;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.sec-warn.warn {
+  color: var(--warning);
+  border: 1px solid rgba(245, 158, 11, 0.2);
+  background: rgba(245, 158, 11, 0.1);
+}
+
+.sec-warn.fail {
+  color: var(--error);
+  border: 1px solid rgba(239, 68, 68, 0.2);
+  background: rgba(239, 68, 68, 0.1);
+}
+
+.sec-warn.pass {
+  color: var(--success);
+  border: 1px solid rgba(16, 185, 129, 0.2);
+  background: rgba(16, 185, 129, 0.1);
+}
+
+.sec-warn.info {
+  color: var(--info);
+  border: 1px solid rgba(59, 130, 246, 0.2);
+  background: rgba(59, 130, 246, 0.1);
+}
+
+.sec-warn.neutral {
+  color: var(--text-secondary);
+  border: 1px solid var(--panel-border);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+/* Incidents list and row elements */
+.incidents-list {
+  margin-top: 0.6rem;
+  padding-top: 0.6rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  width: 100%;
+}
+
+.incidents-list.hidden {
+  display: none !important;
+}
+
+.incident-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.5rem;
+  font-size: 0.72rem;
+  padding: 0.25rem 0;
+  width: 100%;
+  word-break: break-all;
+  border-bottom: 1px dashed rgba(255, 255, 255, 0.03);
+}
+
+.incident-row:last-child {
+  border-bottom: none;
+}
+
+.incident-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  flex-grow: 1;
+  min-width: 0;
+}
+
+.incident-number {
+  color: var(--text-muted);
+  margin-right: 0.3rem;
+}
+
+.incident-meta {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex-shrink: 0;
+}
+
+.incident-type-tag {
+  font-size: 0.68rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  background: rgba(255, 255, 255, 0.05);
+  padding: 0.1rem 0.3rem;
+  border-radius: 3px;
+}
+
+.bubble-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+}
+
+.bubble-details {
+  font-size: 0.72rem;
+  color: var(--text-secondary);
+  margin-top: 0.15rem;
+}
+
+.bubble-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-shrink: 0;
+}
+
+.bubble-header .toggle-icon {
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  transition: transform 0.2s ease;
+}
+
+/* Findings Subheadings */
+.findings-subheading {
+  font-weight: 700;
+  font-size: 0.78rem;
+  margin-bottom: 0.5rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.findings-subheading.fail {
+  color: var(--error);
+}
+
+.findings-subheading.warn {
+  color: var(--warning);
+}
+
+.findings-subheading.pass {
+  color: var(--success);
+}
+
+.findings-subheading:not(:first-child) {
+  margin-top: 1.25rem;
+}
+
+/* Detail panel guide button styling */
+.guide-trigger-btn {
+  margin-top: -0.5rem;
+  margin-bottom: 1.25rem;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  font-size: 0.85rem;
+  padding: 0.6rem;
+}
+
+/* Credits list styling */
+.credits-list {
+  margin-top: 0.75rem;
+  list-style: none;
+  padding-left: 0 !important;
+}
+
+.credits-item {
+  margin-bottom: 0.75rem;
+  line-height: 1.5;
+}
+
+.credits-item strong a {
+  font-weight: 600;
+}
+
+.credits-item small {
+  display: inline-block;
+  margin-top: 0.15rem;
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  line-height: 1.4;
+}
+
+/* Custom modal table styling */
+.modal-table-container {
+  margin-top: 1rem;
+  border: 1px solid var(--panel-border);
+  border-radius: 8px;
+  overflow: hidden;
+  font-size: 0.8rem;
+}
+
+.modal-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.modal-table th {
+  padding: 0.6rem 0.85rem;
+  font-family: var(--font-display);
+  font-weight: 600;
+  color: var(--text-secondary);
+  border-bottom: 1px solid var(--panel-border);
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.modal-table td {
+  padding: 0.6rem 0.85rem;
+  color: var(--text-primary);
+  border-bottom: 1px solid var(--panel-border);
+}
+
+.modal-table tr:last-child td {
+  border-bottom: none;
+}
+
+.modal-table td.font-mono {
+  font-family: monospace;
+}
+
+/* License Modal Copyright & Header Cards */
+.app-copyright-card {
+  background: linear-gradient(135deg, rgba(168, 85, 247, 0.12) 0%, rgba(59, 130, 246, 0.04) 100%);
+  border: 1px solid rgba(168, 85, 247, 0.25);
+  border-radius: 8px;
+  padding: 0.85rem 1rem;
+  margin-bottom: 1.25rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.55rem;
+  box-shadow: 0 4px 12px rgba(168, 85, 247, 0.08);
+}
+
+.app-copyright-card i {
+  color: var(--accent-color);
+  font-size: 1.05rem;
+}
+
+.app-copyright-card span {
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  letter-spacing: 0.01em;
+}
+
+.license-header-card {
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 8px;
+  padding: 1rem;
+  margin-bottom: 1.5rem;
+  text-align: center;
+}
+
+.license-header-card h4 {
+  margin: 0 0 0.25rem 0;
+  border: none;
+  padding: 0;
+  color: var(--accent-color);
+  font-weight: 800;
+  font-family: var(--font-display);
+}
+
+.license-header-card .license-version {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  margin-bottom: 0.75rem;
+}
+
+.license-header-card .license-fsf {
+  font-size: 0.78rem;
+  line-height: 1.4;
+  color: var(--text-muted);
+  max-width: 500px;
+  margin: 0 auto;
+}
+
+/* Dictionary Modal Layout & Elements styling */
+.modal-section.divider {
+  border-bottom: 1px solid var(--panel-border);
+  padding-bottom: 1rem;
+  margin-bottom: 1.25rem;
+}
+
+.modal-info-box {
+  background: rgba(147, 51, 234, 0.06);
+  border: 1px solid rgba(147, 51, 234, 0.2);
+  border-radius: 8px;
+  padding: 0.75rem 1rem;
+  font-size: 0.82rem;
+  line-height: 1.5;
+  color: var(--text-primary);
+}
+
+.modal-info-box h5 {
+  color: var(--accent-color);
+  font-weight: 600;
+  font-family: var(--font-display);
+  margin-bottom: 0.35rem;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.modal-info-box p {
+  margin-bottom: 0.5rem;
+  color: var(--text-secondary);
+}
+
+.modal-info-box ol {
+  margin-left: 1.25rem;
+  color: var(--text-secondary);
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.dict-modal-content {
+  padding: 0 !important;
+  min-height: 250px;
+  max-height: 320px;
+  overflow-y: auto;
+  border: 1px solid var(--panel-border);
+  background: rgba(0, 0, 0, 0.15) !important;
+}
+
+#dictTable {
+  font-size: 0.82rem;
+}
+
+.dict-empty-state {
+  padding: 3rem 1rem;
+  min-height: 200px;
+}
+
+.dict-retry-btn {
+  margin-top: 0.5rem;
+  font-size: 0.8rem;
+  padding: 0.5rem 1rem;
+}
+
+.incident-method {
+  color: var(--text-muted);
+  font-size: 0.68rem;
+  text-transform: uppercase;
+}
+
+.guide-trigger-btn i {
+  color: var(--accent-color);
 }
