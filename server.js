@@ -155,9 +155,9 @@ const apiSecurityGuard = (req, res, next) => {
   });
 };
 
-// Apply security guard to all API routes (except /api/status which is public)
+// Apply security guard to all API routes (except public endpoints)
 app.use('/api', (req, res, next) => {
-  if (req.path === '/status') {
+  if (req.path === '/status' || req.path === '/dictionaries') {
     return next();
   }
   apiSecurityGuard(req, res, next);
