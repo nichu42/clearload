@@ -1,0 +1,46 @@
+{
+  "calendly.com": {
+    "name": "Calendly Scheduler",
+    "category": "Meeting Scheduler Link"
+  },
+  "google.com/maps": {
+    "name": "Google Maps",
+    "category": "Interactive Map Embed"
+  },
+  "google.com/recaptcha": {
+    "name": "Google reCAPTCHA",
+    "category": "Security CAPTCHA"
+  },
+  "intercom.io": {
+    "name": "Intercom Messenger",
+    "category": "Live Chat Support Widget"
+  },
+  "mave.io": {
+    "name": "Mave Video Player",
+    "category": "Video Stream Player (Privacy-Enhanced)"
+  },
+  "platform.twitter.com": {
+    "name": "Twitter Widget",
+    "category": "Social Media Integration"
+  },
+  "spotify.com": {
+    "name": "Spotify Player",
+    "category": "Audio Stream Player"
+  },
+  "vimeo.com": {
+    "name": "Vimeo Video",
+    "category": "Video Stream Player"
+  },
+  "wistia.com": {
+    "name": "Wistia Video Player",
+    "category": "Video Stream Player"
+  },
+  "youtube-nocookie.com": {
+    "name": "YouTube Video (Privacy-Enhanced)",
+    "category": "Video Stream Player"
+  },
+  "youtube.com": {
+    "name": "YouTube Video",
+    "category": "Video Stream Player"
+  }
+}

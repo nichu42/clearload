@@ -1,0 +1,23 @@
+{
+  "name": "clearload",
+  "version": "0.1.0",
+  "description": "ClearLoad: Stateless website privacy & cookie security auditor utilizing Playwright and Express",
+  "main": "server.js",
+  "type": "module",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js",
+    "validate-dicts": "node scripts/validate-dictionaries.js",
+    "test": "npm run validate-dicts"
+  },
+  "dependencies": {
+    "@fontsource/outfit": "^5.2.8",
+    "@fontsource/plus-jakarta-sans": "^5.2.8",
+    "@fortawesome/fontawesome-free": "^7.2.0",
+    "express": "^5.2.1",
+    "express-rate-limit": "^7.3.1",
+    "helmet": "^8.2.0",
+    "open": "^11.0.0",
+    "playwright": "^1.60.0"
+  }
+}

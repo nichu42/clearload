@@ -1,0 +1,18 @@
+{
+  "_clck": {
+    "category": "Analytics",
+    "description": "Used by Microsoft Clarity to store a unique visitor identifier for session replays."
+  },
+  "_ga": {
+    "category": "Analytics",
+    "description": "Used by Google Analytics to distinguish unique users by assigning a randomly generated number."
+  },
+  "ak_bmsc": {
+    "category": "Strictly Necessary",
+    "description": "Used by Akamai Bot Manager to distinguish human visitors from automated bots."
+  },
+  "wc_cart_hash": {
+    "category": "Strictly Necessary",
+    "description": "Used by WooCommerce to record items in the shopping cart."
+  }
+}

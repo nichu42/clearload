@@ -1,0 +1,19 @@
+{
+  "Analytics": {
+    "domains": ["clarity.ms", "google-analytics.com", "hotjar.com"],
+    "includes": ["amplitude", "analytics", "mixpanel", "utm_"],
+    "starts_with": ["_cl", "_ga", "_gat", "_gid", "_hj"]
+  },
+  "Marketing/Advertising": {
+    "domains": ["adnxs.com", "criteo.com", "doubleclick.net"],
+    "exact": ["fr"],
+    "includes": ["ads", "advert", "ide", "pixel", "retarget", "track", "visitor_id"],
+    "starts_with": ["_fbc", "_fbp"]
+  },
+  "Strictly Necessary": {
+    "domains": ["paypal.com", "stripe.com"],
+    "exact": ["_abck", "ak_bmsc", "aspsessionid", "jsessionid", "mcsid", "phpsessid"],
+    "includes": ["auth", "cart", "cc_cookie", "checkout", "cookie-consent", "cookie_notice", "csrf", "jwt", "login", "notice", "sess", "session", "sid", "token", "xsrf"],
+    "starts_with": ["__cf", "awsalb", "bunny_shield", "wc_cart", "wc_fragments"]
+  }
+}
