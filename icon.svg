@@ -1,0 +1,57 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <radialGradient id="bgGrad" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" style="stop-color:#1a1f3a;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#0b0d19;stop-opacity:1" />
+    </radialGradient>
+    
+    <radialGradient id="bubbleGrad1" cx="30%" cy="30%" r="70%">
+      <stop offset="0%" style="stop-color:#c084fc;stop-opacity:0.9" />
+      <stop offset="50%" style="stop-color:#8c4bb7;stop-opacity:0.7" />
+      <stop offset="100%" style="stop-color:#502379;stop-opacity:0.5" />
+    </radialGradient>
+    
+    <radialGradient id="bubbleGrad2" cx="35%" cy="35%" r="65%">
+      <stop offset="0%" style="stop-color:#e9d5ff;stop-opacity:0.8" />
+      <stop offset="50%" style="stop-color:#a855f7;stop-opacity:0.6" />
+      <stop offset="100%" style="stop-color:#6b21a8;stop-opacity:0.4" />
+    </radialGradient>
+    
+    <radialGradient id="bubbleGrad3" cx="40%" cy="40%" r="60%">
+      <stop offset="0%" style="stop-color:#f3e8ff;stop-opacity:0.85" />
+      <stop offset="50%" style="stop-color:#c084fc;stop-opacity:0.65" />
+      <stop offset="100%" style="stop-color:#7c3aed;stop-opacity:0.45" />
+    </radialGradient>
+    
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="8" result="coloredBlur"/>
+      <feMerge>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+  
+  <!-- Background -->
+  <rect width="512" height="512" fill="url(#bgGrad)"/>
+  
+  <!-- Large bubble (main) -->
+  <circle cx="256" cy="280" r="120" fill="url(#bubbleGrad1)" filter="url(#glow)"/>
+  <ellipse cx="220" cy="240" rx="35" ry="25" fill="white" opacity="0.3"/>
+  
+  <!-- Medium bubble (top right) -->
+  <circle cx="360" cy="180" r="70" fill="url(#bubbleGrad2)" filter="url(#glow)"/>
+  <ellipse cx="340" cy="160" rx="20" ry="15" fill="white" opacity="0.35"/>
+  
+  <!-- Small bubble (top left) -->
+  <circle cx="160" cy="200" r="50" fill="url(#bubbleGrad3)" filter="url(#glow)"/>
+  <ellipse cx="145" cy="185" rx="15" ry="10" fill="white" opacity="0.4"/>
+  
+  <!-- Tiny bubble (bottom right) -->
+  <circle cx="380" cy="340" r="30" fill="url(#bubbleGrad2)" filter="url(#glow)"/>
+  <ellipse cx="370" cy="330" rx="10" ry="7" fill="white" opacity="0.35"/>
+  
+  <!-- Tiny bubble (bottom left) -->
+  <circle cx="140" cy="360" r="25" fill="url(#bubbleGrad1)" filter="url(#glow)"/>
+  <ellipse cx="132" cy="352" rx="8" ry="6" fill="white" opacity="0.3"/>
+</svg>
