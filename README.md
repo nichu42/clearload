@@ -4,6 +4,10 @@ ClearLoad is an on-demand website privacy, cookie, and security compliance audit
 
 Simply enter any URL, and ClearLoad launches a sandboxed headless browser to capture exactly what cookies, storage keys, iframe widgets, and network connections are loaded **before** a visitor has granted consent.
 
+<p align="left">
+  <a href="https://clearload.42bit.io"><img src="https://img.shields.io/badge/Live_Demo-clearload.42bit.io-7C3AED?style=for-the-badge&logo=windowsterminal&logoColor=white" alt="Live Demo" /></a>
+</p>
+
 ## Why use ClearLoad?
 
 ### 1. Detect Illegal "Pre-Consent" Tracking
