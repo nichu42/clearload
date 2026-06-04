@@ -26,7 +26,7 @@ jobs:
       - name: Install Buildah
         run: apt-get update && apt-get install buildah ca-certificates -y
 
-      - name: Build and Push Docker Image
+      - name: Build and Push Versioned Tag
         uses: https://codeberg.org/actions/buildah-simple@main
         with:
           tag: "codeberg.org/${{ github.repository_owner }}/clearload:${{ github.ref_name }}"
@@ -36,7 +36,12 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
           registry: codeberg.org
 
-      - name: Tag and Push Latest
-        run: |
-          buildah tag codeberg.org/${{ github.repository_owner }}/clearload:${{ github.ref_name }} codeberg.org/${{ github.repository_owner }}/clearload:latest
-          buildah push --storage-driver=vfs --creds "${{ github.actor }}:${{ secrets.GITHUB_TOKEN }}" codeberg.org/${{ github.repository_owner }}/clearload:latest
+      - name: Build and Push Latest Tag
+        uses: https://codeberg.org/actions/buildah-simple@main
+        with:
+          tag: "codeberg.org/${{ github.repository_owner }}/clearload:latest"
+          context: .
+          push: true
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+          registry: codeberg.org
