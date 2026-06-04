@@ -48,11 +48,3 @@ jobs:
             codeberg.org/${{ github.repository }}:latest
             ${{ secrets.DOCKERHUB_USERNAME }}/clearload:${{ github.ref_name }}
             ${{ secrets.DOCKERHUB_USERNAME }}/clearload:latest
-
-      - name: Trigger Bunny.net Rolling Update
-        uses: BunnyWay/actions/container-update-image@main
-        with:
-          app_id: ${{ secrets.BUNNY_APP_ID }}
-          api_key: ${{ secrets.BUNNY_API_KEY }}
-          container: "clearload"
-          image_tag: "${{ github.ref_name }}"
