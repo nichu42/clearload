@@ -24,14 +24,8 @@ jobs:
         run: npm test
 
       - name: Build and Push Docker Image
-        uses: https://codeberg.org/umglurf/buildah-action@main
-        with:
-          cache: false
-          container_file: ./Dockerfile
-          credentials: |
-            codeberg.org=${{ github.actor }}:${{ secrets.GITHUB_TOKEN }}
-          destinations: |
-            codeberg.org/${{ github.repository_owner }}/clearload:${{ github.ref_name }}
-            codeberg.org/${{ github.repository_owner }}/clearload:latest
-          push: true
-          extra_args: --storage-driver=vfs
+        run: |
+          podman build -t codeberg.org/${{ github.repository_owner }}/clearload:${{ github.ref_name }} -t codeberg.org/${{ github.repository_owner }}/clearload:latest -f ./Dockerfile .
+          podman login codeberg.org -u ${{ github.actor }} -p ${{ secrets.GITHUB_TOKEN }}
+          podman push codeberg.org/${{ github.repository_owner }}/clearload:${{ github.ref_name }}
+          podman push codeberg.org/${{ github.repository_owner }}/clearload:latest
