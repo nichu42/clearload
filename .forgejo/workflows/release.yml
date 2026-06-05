@@ -33,7 +33,7 @@ jobs:
           context: .
           push: true
           username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+          password: ${{ secrets.PACKAGE_TOKEN }}
           registry: codeberg.org
 
       - name: Build and Push Latest Tag
@@ -43,5 +43,5 @@ jobs:
           context: .
           push: true
           username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+          password: ${{ secrets.PACKAGE_TOKEN }}
           registry: codeberg.org
