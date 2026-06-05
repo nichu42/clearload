@@ -61,9 +61,9 @@ const PORT = process.env.PORT || 3000;
 // Default: 1 (trust one reverse-proxy hop). This works for the vast majority of
 // deployments — a single nginx, Traefik, Caddy, Bunny.net, Cloudflare, Fly.io,
 // Railway, etc. in front of the app. For chained proxies (e.g. CDN + nginx)
-// set TRUST_PROXY=2 or a specific subnet. To disable trust entirely (e.g. when
+// set TRUSTED_PROXY=2 or a specific subnet. To disable trust entirely (e.g. when
 // exposing the port directly to the internet with no proxy in front), set
-// TRUST_PROXY=false.
+// TRUSTED_PROXY=false.
 //
 // SECURITY NOTE: when trust proxy is enabled, the apiSecurityGuard and rate
 // limiter must NOT use req.ip for the "localhost" check, because an attacker
@@ -71,7 +71,7 @@ const PORT = process.env.PORT || 3000;
 // localhost. See isLocalRequest() below — it uses the real socket address
 // instead, which a header cannot forge.
 //
-// TRUST_PROXY accepts the same value formats as Express itself:
+// TRUSTED_PROXY accepts the same value formats as Express itself:
 //   - false / 0 / no / off  -> trust no proxies
 //   - true  / 1  / yes / on -> trust ALL proxies (insecure, only for local testing)
 //   - <integer>             -> trust that many reverse-proxy hops (default: 1)
@@ -84,7 +84,12 @@ function parseTrustProxy(value) {
   if (v === '') return 1;
 
   if (/^(false|0|no|off)$/i.test(v)) return false;
-  if (/^(true|1|yes|on)$/i.test(v)) return true;
+  // Note: "1" is intentionally NOT in the boolean-true alternation. "1" should
+  // mean "trust one hop" (an integer), not "trust all proxies" (boolean true).
+  // Express treats any truthy value as "trust all", so we must return the
+  // boolean true ONLY for unambiguous truthy strings, and let the numeric regex
+  // below handle "1" as the integer 1.
+  if (/^(true|yes|on)$/i.test(v)) return true;
   if (/^\d+$/.test(v)) return parseInt(v, 10);
   if (/^(loopback|linklocal|uniquelocal)$/i.test(v)) return v.toLowerCase();
   if (v.includes(',')) {
@@ -93,14 +98,14 @@ function parseTrustProxy(value) {
   return v;
 }
 
-const trustProxySetting = parseTrustProxy(process.env.TRUST_PROXY);
+const trustProxySetting = parseTrustProxy(process.env.TRUSTED_PROXY);
 app.set('trust proxy', trustProxySetting);
 if (trustProxySetting === true) {
-  console.warn(`[Security] WARNING: TRUST_PROXY is set to "${process.env.TRUST_PROXY}". This trusts the X-Forwarded-For header from any source, allowing clients to spoof their IP address and bypass rate limiting. Use a specific IP/CIDR (e.g. TRUST_PROXY=10.0.0.0/8) or a hop count (e.g. TRUST_PROXY=1) instead.`);
+  console.warn(`[Security] WARNING: TRUSTED_PROXY is set to "${process.env.TRUSTED_PROXY}". This trusts the X-Forwarded-For header from any source, allowing clients to spoof their IP address and bypass rate limiting. Use a specific IP/CIDR (e.g. TRUSTED_PROXY=10.0.0.0/8) or a hop count (e.g. TRUSTED_PROXY=1) instead.`);
 } else if (trustProxySetting === false) {
-  console.log(`[Security] Express 'trust proxy' is disabled (TRUST_PROXY=${process.env.TRUST_PROXY}).`);
+  console.log(`[Security] Express 'trust proxy' is disabled (TRUSTED_PROXY=${process.env.TRUSTED_PROXY}).`);
 } else {
-  console.log(`[Security] Express 'trust proxy' set to ${JSON.stringify(trustProxySetting)} (TRUST_PROXY env var).`);
+  console.log(`[Security] Express 'trust proxy' set to ${JSON.stringify(trustProxySetting)} (TRUSTED_PROXY env var).`);
 }
 
 app.use(helmet({
@@ -128,13 +133,42 @@ app.use(express.json({ limit: '1kb' }));
 
 
 
-// Serve static frontend files
-app.use(express.static(path.join(__dirname, 'public')));
+// Cache-control helpers. Per the project policy:
+//   - Self-hosted vendor assets (text fonts via @fontsource + icon fonts via
+//     @fortawesome, plus their accompanying CSS/JS/SVG) are aggressively
+//     cached. These only change when the npm packages are upgraded, which
+//     produces a new Docker image; the file names don't change, so
+//     'immutable' is safe for the lifetime of an image.
+//   - Everything else — the SPA bundle (index.html / app.js / style.css),
+//     every /api/* response, and the SPA fallback — is marked no-store, so
+//     browsers and CDNs always revalidate and never serve a stale app
+//     version, footer, or rate-limit response.
+function noStore(req, res, next) {
+  res.set('Cache-Control', 'no-store');
+  next();
+}
+function longCache(req, res, next) {
+  res.set('Cache-Control', 'public, max-age=31536000, immutable');
+  next();
+}
 
-// Serve third-party assets locally from node_modules to ensure GDPR compliance
-app.use('/vendor/fontawesome', express.static(path.join(__dirname, 'node_modules', '@fortawesome', 'fontawesome-free')));
-app.use('/vendor/fonts/outfit', express.static(path.join(__dirname, 'node_modules', '@fontsource', 'outfit')));
-app.use('/vendor/fonts/plus-jakarta-sans', express.static(path.join(__dirname, 'node_modules', '@fontsource', 'plus-jakarta-sans')));
+// Self-hosted vendor assets: cache aggressively. Path-specific middlewares are
+// listed first so the long-cache header wins over the generic no-store applied
+// below. This covers:
+//   - /vendor/fonts/outfit/*         (Outfit text font, @fontsource)
+//   - /vendor/fonts/plus-jakarta-sans/* (Plus Jakarta Sans text font, @fontsource)
+//   - /vendor/fontawesome/*          (FontAwesome icon fonts + their CSS/JS/SVG)
+app.use('/vendor/fonts/outfit', longCache, express.static(path.join(__dirname, 'node_modules', '@fontsource', 'outfit')));
+app.use('/vendor/fonts/plus-jakarta-sans', longCache, express.static(path.join(__dirname, 'node_modules', '@fontsource', 'plus-jakarta-sans')));
+app.use('/vendor/fontawesome', longCache, express.static(path.join(__dirname, 'node_modules', '@fortawesome', 'fontawesome-free')));
+
+// All other static / api / fallback responses: no-store.
+// The middleware below fires for every request path, sets no-store, then
+// either serves a file (public/) or falls through to the /api/* routes.
+// The header stays on the res object for the rest of the chain, so
+// /api/status, /api/dictionaries, /api/scan, and the SPA fallback all
+// inherit it without each handler having to set it.
+app.use(noStore, express.static(path.join(__dirname, 'public')));
 
 // 1. Validate configured API keys on startup if set
 const expectedApiKeys = [];
@@ -304,11 +338,16 @@ function isPrivateIP(ip) {
 
 // API Status endpoint
 app.get('/api/status', (req, res) => {
-  res.json({
+  // No-store: the status endpoint reflects runtime configuration (env vars,
+  // package version) and must always return the current values. CDNs otherwise
+  // happily cache a tiny JSON response for days/weeks, leaving the UI showing
+  // a stale version number and a stale FOOTER_TEXT after a deploy.
+  res.set('Cache-Control', 'no-store').json({
     status: 'ok',
     environment: 'dynamic',
     version: APP_VERSION,
-    footerText: process.env.FOOTER_TEXT !== undefined ? process.env.FOOTER_TEXT : 'presented by (42bit.io)[42bit.io]'
+    footerText: process.env.FOOTER_TEXT !== undefined ? process.env.FOOTER_TEXT : 'presented by (42bit.io)[42bit.io]',
+    legalLink: process.env.LEGAL_LINK || null
   });
 });
 
@@ -448,10 +487,40 @@ app.get('/*splat', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
+// Startup log: show every environment variable the server has read and the value
+// (or effective value, after defaults) that will be used at runtime. Useful for
+// verifying deployment configuration without redeploying to test each variable.
+// Sensitive values (API keys) are masked.
+function summariseConfig() {
+  const apiKeyCount = expectedApiKeys.length;
+  const footerRaw = process.env.FOOTER_TEXT;
+  const footerDisplay = footerRaw !== undefined
+    ? (footerRaw.length > 80 ? `"${footerRaw.slice(0, 80)}…"` : `"${footerRaw}"`)
+    : '(default: "presented by (42bit.io)[42bit.io]")';
+  return [
+    ['PORT',                process.env.PORT || '3000 (default)'],
+    ['NODE_ENV',            process.env.NODE_ENV || '(not set)'],
+    ['TRUSTED_HOST',        process.env.TRUSTED_HOST || '(not set)'],
+    ['TRUSTED_PROXY',       process.env.TRUSTED_PROXY !== undefined ? process.env.TRUSTED_PROXY : '1 (default)'],
+    ['API_KEY',             apiKeyCount > 0 ? `**** (${apiKeyCount} key${apiKeyCount === 1 ? '' : 's'} loaded)` : '(not set — same-origin/localhost only)'],
+    ['RATE_LIMIT_WINDOW_SEC', String(limitWindowSec)],
+    ['RATE_LIMIT_MAX',      isRateLimitEnabled ? String(rateLimitMax) : '0 (rate limiting disabled)'],
+    ['MAX_CONCURRENT_SCANS', String(maxConcurrentScans)],
+    ['FOOTER_TEXT',         footerDisplay],
+    ['LEGAL_LINK',          process.env.LEGAL_LINK || '(not set — link hidden)'],
+    ['OPEN_BROWSER',        process.env.OPEN_BROWSER || '(not set)'],
+  ];
+}
+
 app.listen(PORT, () => {
   const url = `http://localhost:${PORT}`;
   console.log(`ClearLoad server running on ${url}`);
-  
+
+  console.log('[Config] Environment variables processed at startup:');
+  for (const [name, value] of summariseConfig()) {
+    console.log(`         ${name.padEnd(22)} = ${value}`);
+  }
+
   if (process.env.OPEN_BROWSER === 'true') {
     open(url).catch(() => {
       // Fail silently if browser cannot be opened automatically

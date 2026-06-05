@@ -175,21 +175,22 @@ When deploying ClearLoad on public Internet servers, you can configure security 
 
 | Environment Variable | Description | Default |
 | :--- | :--- | :--- |
-| `PORT` | The port on which the Express application server listens. | `3000` |
-| `TRUSTED_HOST` | The trusted hostname for same-origin checks. When set, the server compares incoming `Origin` and `Referer` headers against this value instead of the `Host` header from the request. This prevents Host header spoofing attacks in production deployments behind reverse proxies. | *Not set* (uses `Host` header from request) |
 | `API_KEY` | Comma or semicolon-separated list of authorized keys. When set, external API calls must supply a matching key in the `x-api-key` header. Same-origin browser requests and localhost calls are automatically exempted. | *Not set* (restricted to same-origin/localhost) |
-| `RATE_LIMIT_WINDOW_SEC` | The tracking window in seconds for IP rate limiting. | `900` (15 minutes) |
-| `RATE_LIMIT_MAX` | The maximum number of scan requests allowed per IP address in the window. Set to `0` to disable rate limiting entirely. | `3` |
-| `TRUST_PROXY` | Tells Express which reverse proxies to trust when reading the `X-Forwarded-For` header (so the original client IP is used for rate limiting and security checks). Accepts the standard Express formats: `false` (disable trust), `true` (insecure, trusts all), an integer hop count (e.g. `1`), a named preset (`loopback`, `linklocal`, `uniquelocal`), a single IP/CIDR (e.g. `10.0.0.0/8`), or a comma-separated list of any of the above. | `1` (one reverse-proxy hop) |
-| `MAX_CONCURRENT_SCANS` | The maximum number of browser audits running in parallel on the server to prevent CPU/RAM exhaustion. | `2` |
 | `FOOTER_TEXT` | Custom branding or text to display in the web application's footer. Supports basic markdown/markup formatting (bold, italics, links, and newlines). | `presented by (42bit.io)[42bit.io]` |
+| `LEGAL_LINK` | Optional URL to your Imprint / Legal Notice / Privacy Policy page. When set, a "Legal Notice & Privacy Policy" link is rendered in the footer between `Disclaimer` and `License`, opening in a new tab. When unset, the link (and its ` • ` separator) are hidden. | *Not set* (link hidden) |
+| `MAX_CONCURRENT_SCANS` | The maximum number of browser audits running in parallel on the server to prevent CPU/RAM exhaustion. | `2` |
 | `OPEN_BROWSER` | When set to `true`, the application attempts to automatically open the app URL in the default system browser on server startup. | *Not set* |
+| `PORT` | The port on which the Express application server listens. | `3000` |
+| `RATE_LIMIT_MAX` | The maximum number of scan requests allowed per IP address in the window. Set to `0` to disable rate limiting entirely. | `3` |
+| `RATE_LIMIT_WINDOW_SEC` | The tracking window in seconds for IP rate limiting. | `900` (15 minutes) |
+| `TRUSTED_PROXY` | Tells Express which reverse proxies to trust when reading the `X-Forwarded-For` header (so the original client IP is used for rate limiting and security checks). Accepts the standard Express formats: `false` (disable trust), `true` (insecure, trusts all), an integer hop count (e.g. `1`), a named preset (`loopback`, `linklocal`, `uniquelocal`), a single IP/CIDR (e.g. `10.0.0.0/8`), or a comma-separated list of any of the above. | `1` (one reverse-proxy hop) |
+| `TRUSTED_HOST` | The trusted hostname for same-origin checks. When set, the server compares incoming `Origin` and `Referer` headers against this value instead of the `Host` header from the request. This prevents Host header spoofing attacks in production deployments behind reverse proxies. **Format:** a single bare hostname (e.g. `clearload.42bit.io`) — no scheme, no port, no path. Must match the `Host` header browsers send for your deployment. Only one value is supported; for multiple hostnames, set this to the canonical host and ensure all clients use it. | *Not set* (uses `Host` header from request) |
 
-### `TRUST_PROXY` — Common Deployment Recipes
+### `TRUSTED_PROXY` — Common Deployment Recipes
 
 The default of `1` works out of the box for a single reverse proxy in front of the app. Override it only if your setup differs:
 
-| Deployment | Recommended `TRUST_PROXY` | Why |
+| Deployment | Recommended `TRUSTED_PROXY` | Why |
 | :--- | :--- | :--- |
 | Running on your laptop (no proxy) | *(unset, default)* | No `X-Forwarded-For` is sent, so the setting is ignored. |
 | Docker on your laptop (no proxy) | *(unset, default)* | Same — ignored. |
@@ -198,7 +199,18 @@ The default of `1` works out of the box for a single reverse proxy in front of t
 | No proxy at all, port exposed directly to the internet | `false` | Prevents rate-limit spoofing via fake `X-Forwarded-For`. |
 | A specific proxy IP you want to pin to | e.g. `10.0.0.0/8` or `203.0.113.10` | Strictest match. |
 
-**Note:** the localhost API bypass always uses the real TCP socket address (not the `X-Forwarded-For` header), so it stays unforgeable regardless of how `TRUST_PROXY` is set. A local nginx in front of the app is *not* considered "local" — set `TRUSTED_HOST` or supply an `API_KEY` for it.
+**Note:** the localhost API bypass always uses the real TCP socket address (not the `X-Forwarded-For` header), so it stays unforgeable regardless of how `TRUSTED_PROXY` is set. A local nginx in front of the app is *not* considered "local" — set `TRUSTED_HOST` or supply an `API_KEY` for it.
+
+### Production Hardening
+
+ClearLoad's built-in rate limiter (default: 3 scans per 15 minutes per IP) is the primary security boundary, but it is not a substitute for edge protection. For any public deployment, place the app behind a WAF, CDN, or reverse proxy that provides:
+
+- DDoS protection and bot detection
+- TLS termination
+- IP-based blocklists (e.g. Spamhaus, firehol)
+- Edge rate limiting as a second layer
+
+Examples that work well: Cloudflare (free tier covers this), Bunny.net (the project's recommended host), AWS CloudFront + WAF, or a self-hosted nginx with the `modsecurity` + `fail2ban` stack. The `TRUSTED_PROXY` setting must be adjusted to match the number of trusted hops in your chain (see above).
 
 ### Key Length & Format Constraints
 * API keys must be between **32 and 128 characters** long.

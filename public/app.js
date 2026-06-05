@@ -1493,6 +1493,11 @@ document.addEventListener('DOMContentLoaded', () => {
       } else if (!/^https?:\/\//i.test(targetUrl) && !targetUrl.startsWith('/') && !targetUrl.startsWith('#')) {
         targetUrl = 'https://' + targetUrl;
       }
+      // URL-encode so that spaces, ampersands, and other unsafe characters
+      // never produce a structurally invalid href. Without this, some browsers
+      // (notably stricter desktop engines) refuse to render the <a> tag entirely
+      // when the href contains unencoded spaces or entities like &amp;.
+      targetUrl = encodeURI(targetUrl);
       return `<a href="${targetUrl}" target="_blank" rel="noopener noreferrer" style="color: var(--accent-color); text-decoration: none; font-weight: 500; transition: var(--transition-smooth);">${linkText}</a>`;
     });
 
@@ -1504,6 +1509,11 @@ document.addEventListener('DOMContentLoaded', () => {
       } else if (!/^https?:\/\//i.test(targetUrl) && !targetUrl.startsWith('/') && !targetUrl.startsWith('#')) {
         targetUrl = 'https://' + targetUrl;
       }
+      // URL-encode so that spaces, ampersands, and other unsafe characters
+      // never produce a structurally invalid href. Without this, some browsers
+      // (notably stricter desktop engines) refuse to render the <a> tag entirely
+      // when the href contains unencoded spaces or entities like &amp;.
+      targetUrl = encodeURI(targetUrl);
       return `<a href="${targetUrl}" target="_blank" rel="noopener noreferrer" style="color: var(--accent-color); text-decoration: none; font-weight: 500; transition: var(--transition-smooth);">${linkText}</a>`;
     });
     
@@ -1532,6 +1542,14 @@ document.addEventListener('DOMContentLoaded', () => {
         const footerCustomEl = document.getElementById('footerCustomText');
         if (footerCustomEl) {
           footerCustomEl.innerHTML = parseMarkdown(data.footerText);
+        }
+      }
+      if (data && data.legalLink) {
+        const link = document.getElementById('legalLink');
+        const wrapper = document.getElementById('legalLinkWrapper');
+        if (link && wrapper) {
+          link.href = data.legalLink;
+          wrapper.style.display = '';
         }
       }
     } catch (e) {
