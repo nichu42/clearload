@@ -23,12 +23,85 @@ function safeCompare(a, b) {
   }
 }
 
+// Detect whether a request genuinely originated from this machine.
+// This is the ONLY safe way to implement the "localhost exemption" because it
+// relies on the real TCP socket address (which an attacker cannot forge from
+// the outside) rather than on req.ip (which honours the X-Forwarded-For
+// header once trust proxy is enabled). It also requires no X-Forwarded-For /
+// X-Real-IP header to be present, so a request that comes in through a local
+// reverse proxy is correctly *not* treated as local.
+function isLocalRequest(req) {
+  const socketIp = (req.socket && req.socket.remoteAddress)
+    || (req.connection && req.connection.remoteAddress)
+    || '';
+  const isLoopback = socketIp === '127.0.0.1'
+    || socketIp === '::1'
+    || socketIp === '::ffff:127.0.0.1';
+  if (!isLoopback) return false;
+  const hasForwardedHeader = !!(req.headers['x-forwarded-for'] || req.headers['x-real-ip']);
+  return !hasForwardedHeader;
+}
+
 // Read version from package.json dynamically
 const packageJson = JSON.parse(fs.readFileSync(path.join(__dirname, 'package.json'), 'utf8'));
 const APP_VERSION = packageJson.version;
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+
+// Configure Express 'trust proxy' setting.
+// This MUST be set before any middleware that relies on req.ip (express-rate-limit,
+// the apiSecurityGuard, etc.). When ClearLoad runs behind a reverse proxy
+// (e.g. nginx, Traefik, Caddy) inside a container, the proxy injects an
+// X-Forwarded-For header on every request. express-rate-limit v7+ throws
+// ERR_ERL_UNEXPECTED_X_FORWARDED_FOR when that header is present but trust
+// proxy is still the default (false), which falsely appears as if the client
+// is spoofing its source address.
+//
+// Default: 1 (trust one reverse-proxy hop). This works for the vast majority of
+// deployments — a single nginx, Traefik, Caddy, Bunny.net, Cloudflare, Fly.io,
+// Railway, etc. in front of the app. For chained proxies (e.g. CDN + nginx)
+// set TRUST_PROXY=2 or a specific subnet. To disable trust entirely (e.g. when
+// exposing the port directly to the internet with no proxy in front), set
+// TRUST_PROXY=false.
+//
+// SECURITY NOTE: when trust proxy is enabled, the apiSecurityGuard and rate
+// limiter must NOT use req.ip for the "localhost" check, because an attacker
+// who can reach the app could forge `X-Forwarded-For: 127.0.0.1` to fake
+// localhost. See isLocalRequest() below — it uses the real socket address
+// instead, which a header cannot forge.
+//
+// TRUST_PROXY accepts the same value formats as Express itself:
+//   - false / 0 / no / off  -> trust no proxies
+//   - true  / 1  / yes / on -> trust ALL proxies (insecure, only for local testing)
+//   - <integer>             -> trust that many reverse-proxy hops (default: 1)
+//   - loopback / linklocal / uniquelocal  -> built-in Express presets
+//   - <ip-or-cidr>          -> a single proxy address, e.g. 10.0.0.0/8
+//   - <a,b,c>               -> comma-separated list of IPs, CIDRs, or presets
+function parseTrustProxy(value) {
+  if (value === undefined || value === null) return 1;
+  const v = String(value).trim();
+  if (v === '') return 1;
+
+  if (/^(false|0|no|off)$/i.test(v)) return false;
+  if (/^(true|1|yes|on)$/i.test(v)) return true;
+  if (/^\d+$/.test(v)) return parseInt(v, 10);
+  if (/^(loopback|linklocal|uniquelocal)$/i.test(v)) return v.toLowerCase();
+  if (v.includes(',')) {
+    return v.split(',').map(s => s.trim()).filter(Boolean);
+  }
+  return v;
+}
+
+const trustProxySetting = parseTrustProxy(process.env.TRUST_PROXY);
+app.set('trust proxy', trustProxySetting);
+if (trustProxySetting === true) {
+  console.warn(`[Security] WARNING: TRUST_PROXY is set to "${process.env.TRUST_PROXY}". This trusts the X-Forwarded-For header from any source, allowing clients to spoof their IP address and bypass rate limiting. Use a specific IP/CIDR (e.g. TRUST_PROXY=10.0.0.0/8) or a hop count (e.g. TRUST_PROXY=1) instead.`);
+} else if (trustProxySetting === false) {
+  console.log(`[Security] Express 'trust proxy' is disabled (TRUST_PROXY=${process.env.TRUST_PROXY}).`);
+} else {
+  console.log(`[Security] Express 'trust proxy' set to ${JSON.stringify(trustProxySetting)} (TRUST_PROXY env var).`);
+}
 
 app.use(helmet({
   contentSecurityPolicy: {
@@ -112,8 +185,9 @@ const apiSecurityGuard = (req, res, next) => {
   const apiKey = req.headers['x-api-key'];
 
   // Check if request is from localhost (same machine)
-  const clientIp = req.ip;
-  const isLocalhost = clientIp === '127.0.0.1' || clientIp === '::1' || clientIp === '::ffff:127.0.0.1';
+  // isLocalRequest uses the socket address, NOT req.ip, so the bypass cannot
+  // be triggered by a forged X-Forwarded-For header from a remote attacker.
+  const isLocalhost = isLocalRequest(req);
 
   // Check if Same-Origin (official frontend on the same domain)
   let isSameOrigin = false;
@@ -181,9 +255,10 @@ const scanLimiter = isRateLimitEnabled
       legacyHeaders: false,
       skip: (req) => {
         // Skip rate-limiting for localhost and valid API keys
-        const clientIp = req.ip;
-        const isLocalhost = clientIp === '127.0.0.1' || clientIp === '::1' || clientIp === '::ffff:127.0.0.1';
-        
+        // isLocalRequest uses the socket address, NOT req.ip, so the bypass
+        // cannot be triggered by a forged X-Forwarded-For header.
+        const isLocalhost = isLocalRequest(req);
+
         const apiKey = req.headers['x-api-key'];
         let hasValidApiKey = false;
         if (apiKey) {

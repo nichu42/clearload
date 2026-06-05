@@ -180,9 +180,25 @@ When deploying ClearLoad on public Internet servers, you can configure security 
 | `API_KEY` | Comma or semicolon-separated list of authorized keys. When set, external API calls must supply a matching key in the `x-api-key` header. Same-origin browser requests and localhost calls are automatically exempted. | *Not set* (restricted to same-origin/localhost) |
 | `RATE_LIMIT_WINDOW_SEC` | The tracking window in seconds for IP rate limiting. | `900` (15 minutes) |
 | `RATE_LIMIT_MAX` | The maximum number of scan requests allowed per IP address in the window. Set to `0` to disable rate limiting entirely. | `3` |
+| `TRUST_PROXY` | Tells Express which reverse proxies to trust when reading the `X-Forwarded-For` header (so the original client IP is used for rate limiting and security checks). Accepts the standard Express formats: `false` (disable trust), `true` (insecure, trusts all), an integer hop count (e.g. `1`), a named preset (`loopback`, `linklocal`, `uniquelocal`), a single IP/CIDR (e.g. `10.0.0.0/8`), or a comma-separated list of any of the above. | `1` (one reverse-proxy hop) |
 | `MAX_CONCURRENT_SCANS` | The maximum number of browser audits running in parallel on the server to prevent CPU/RAM exhaustion. | `2` |
 | `FOOTER_TEXT` | Custom branding or text to display in the web application's footer. Supports basic markdown/markup formatting (bold, italics, links, and newlines). | `presented by (42bit.io)[42bit.io]` |
 | `OPEN_BROWSER` | When set to `true`, the application attempts to automatically open the app URL in the default system browser on server startup. | *Not set* |
+
+### `TRUST_PROXY` — Common Deployment Recipes
+
+The default of `1` works out of the box for a single reverse proxy in front of the app. Override it only if your setup differs:
+
+| Deployment | Recommended `TRUST_PROXY` | Why |
+| :--- | :--- | :--- |
+| Running on your laptop (no proxy) | *(unset, default)* | No `X-Forwarded-For` is sent, so the setting is ignored. |
+| Docker on your laptop (no proxy) | *(unset, default)* | Same — ignored. |
+| One reverse proxy in front (nginx, Traefik, Caddy, Bunny.net edge, Cloudflare, Fly.io, Railway, Render, …) | *(unset, default)* | One hop is exactly right. |
+| Two hops in front (e.g. CDN + nginx) | `2` | Two hops means two trusted proxies. |
+| No proxy at all, port exposed directly to the internet | `false` | Prevents rate-limit spoofing via fake `X-Forwarded-For`. |
+| A specific proxy IP you want to pin to | e.g. `10.0.0.0/8` or `203.0.113.10` | Strictest match. |
+
+**Note:** the localhost API bypass always uses the real TCP socket address (not the `X-Forwarded-For` header), so it stays unforgeable regardless of how `TRUST_PROXY` is set. A local nginx in front of the app is *not* considered "local" — set `TRUSTED_HOST` or supply an `API_KEY` for it.
 
 ### Key Length & Format Constraints
 * API keys must be between **32 and 128 characters** long.
