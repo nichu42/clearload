@@ -428,6 +428,65 @@ header {
   margin-bottom: 1.75rem;
 }
 
+.error-card[data-category="private_ip"],
+.error-card[data-category="security"],
+.error-card[data-category="access_denied"] {
+  border-color: rgba(239, 68, 68, 0.45);
+  box-shadow: 0 0 24px rgba(239, 68, 68, 0.1);
+}
+
+.error-card[data-category="private_ip"] .error-icon,
+.error-card[data-category="security"] .error-icon,
+.error-card[data-category="access_denied"] .error-icon {
+  color: var(--error);
+}
+
+.error-card[data-category="bad_protocol"],
+.error-card[data-category="bad_hostname"],
+.error-card[data-category="bad_port"],
+.error-card[data-category="bad_input"],
+.error-card[data-category="control_chars"],
+.error-card[data-category="invalid_url"],
+.error-card[data-category="empty"],
+.error-card[data-category="connection"],
+.error-card[data-category="dns_failure"],
+.error-card[data-category="too_many_redirects"],
+.error-card[data-category="bad_header"],
+.error-card[data-category="busy"],
+.error-card[data-category="rate_limit"] {
+  border-color: rgba(245, 158, 11, 0.4);
+  box-shadow: 0 0 24px rgba(245, 158, 11, 0.08);
+}
+
+.error-card[data-category="bad_protocol"] .error-icon,
+.error-card[data-category="bad_hostname"] .error-icon,
+.error-card[data-category="bad_port"] .error-icon,
+.error-card[data-category="bad_input"] .error-icon,
+.error-card[data-category="control_chars"] .error-icon,
+.error-card[data-category="invalid_url"] .error-icon,
+.error-card[data-category="empty"] .error-icon,
+.error-card[data-category="connection"] .error-icon,
+.error-card[data-category="dns_failure"] .error-icon,
+.error-card[data-category="too_many_redirects"] .error-icon,
+.error-card[data-category="bad_header"] .error-icon,
+.error-card[data-category="busy"] .error-icon,
+.error-card[data-category="rate_limit"] .error-icon {
+  color: var(--warning);
+}
+
+.error-card[data-category="userinfo"] {
+  border-color: rgba(59, 130, 246, 0.4);
+  box-shadow: 0 0 24px rgba(59, 130, 246, 0.08);
+}
+
+.error-card[data-category="userinfo"] .error-icon {
+  color: var(--info);
+}
+
+.error-card .error-icon {
+  transition: var(--transition-smooth);
+}
+
 .secondary-btn {
   background: rgba(255, 255, 255, 0.05);
   color: var(--text-primary);
@@ -757,6 +816,10 @@ a.url-badge:hover {
 
 .tab-content-container {
   padding: 1.75rem;
+}
+
+.tab-content {
+  display: block;
 }
 
 .tab-content.hidden {
@@ -1529,6 +1592,13 @@ footer a:hover {
   border-color: var(--accent-color);
   background: rgba(0, 0, 0, 0.35);
   box-shadow: 0 0 10px rgba(147, 51, 234, 0.15);
+}
+
+.input-hint {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  margin-top: 0.15rem;
+  font-style: italic;
 }
 
 /* Modal Overlay */

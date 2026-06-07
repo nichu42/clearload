@@ -115,8 +115,6 @@ You can launch ClearLoad instantly without manually cloning the repository. Open
 
 ClearLoad is pre-packaged as a Docker container. Since Playwright requires underlying system libraries, the container simplifies deployment.
 
-The project contains a `.dockerignore` file to ensure local files like `node_modules`, `.git`, `.env` configurations, and developer instructions (`AGENTS.md`) are kept out of the container context.
-
 ### Running with Docker Compose
 To build and run the container locally:
 ```bash
@@ -141,7 +139,7 @@ Because this project automatically publishes public, pre-built container images,
 * **Codeberg Registry:** `codeberg.org/nichu42/clearload:latest`
 * **Port:** `3000`
 
-*(Note: You can substitute the `latest` tag with any specific release tag, such as `v1.0.0`, on either registry.)*
+*(Note: You can substitute the `latest` tag with any specific release tag, such as `v1.0.0`.)*
 
 No registry account or authentication is required to pull these public images.
 

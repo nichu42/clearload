@@ -3,6 +3,8 @@ node_modules/
 
 # Log files
 *.log
+server.err
+server.out
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*

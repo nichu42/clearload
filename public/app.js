@@ -86,7 +86,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const scannedUrlTextLink = document.getElementById('scannedUrlTextLink');
   const scanTimeText = document.getElementById('scanTimeText');
   
-  const cookieBadgeCount = document.getElementById('cookieBadgeCount');
+  const storageBadgeCount = document.getElementById('storageBadgeCount');
   const connBadgeCount = document.getElementById('connBadgeCount');
   
   // Data state
@@ -150,71 +150,120 @@ document.addEventListener('DOMContentLoaded', () => {
       });
       
       let errorMsg = 'The audit scan failed. Please check that the website is online and publicly reachable.';
+      let errorCategory = null;
       try {
         const data = await response.json();
         if (response.ok && data.success) {
           currentScanData = data;
-          renderDashboard(data);
+          try {
+            renderDashboard(data);
+          } catch (e) {
+            console.error('renderDashboard error:', e);
+          }
           showDashboard();
           return;
         }
         errorMsg = data.error || errorMsg;
+        errorCategory = data.category || null;
       } catch (jsonErr) {
-        // Fallback to HTTP status codes if JSON parsing fails
-        if (response.status === 400) {
-          errorMsg = 'Please provide a valid website domain name (e.g., yourwebsite.com).';
-        } else if (response.status === 429) {
+        if (response.status === 429) {
           errorMsg = 'Too many audits have been requested from your IP address. Please wait a few minutes before trying again.';
+          errorCategory = 'rate_limit';
         } else if (response.status === 503) {
           errorMsg = 'The server is currently busy processing audits for other websites. Please wait a few seconds and try again.';
+          errorCategory = 'busy';
         } else if (response.status === 403 || response.status === 401) {
           errorMsg = 'Access denied. This server\'s scan API is restricted to authorized requests.';
+          errorCategory = 'access_denied';
+        } else if (response.status === 400) {
+          errorCategory = 'bad_input';
         }
       }
-      showError(errorMsg);
+      if (errorCategory) {
+        showCategorizedError(errorCategory, errorMsg);
+      } else {
+        showError(errorMsg);
+      }
     } catch (err) {
       showError('Could not communicate with the scanner backend. Please check your network connection.');
     }
   }
 
-  // Domain Sanitization and Validation
-  function cleanAndValidateDomain(str) {
-    let input = str.trim();
-    if (!input) return null;
+  // URL Sanitization and Validation (frontend mirror of server validation)
+  function cleanAndValidateUrl(str) {
+    if (!str) return { ok: false, category: 'empty', error: 'Please enter a URL to audit (e.g., yourwebsite.com or yourwebsite.com/blog).' };
 
-    // Strip any leading http:// or https:// if typed
-    input = input.replace(/^https?:\/\//i, '');
+    const raw = String(str).trim();
+    if (!raw) return { ok: false, category: 'empty', error: 'Please enter a URL to audit (e.g., yourwebsite.com or yourwebsite.com/blog).' };
 
-    // Remove any paths, queries, or trailing slashes (keep only host part)
-    input = input.split('/')[0];
-
-    // Basic domain structure check (must contain a dot, valid characters, and end with a TLD or port)
-    // Allows subdomains and localhost or IP addresses as hosts
-    const domainRegex = /^[a-zA-Z0-9.-]+\.[a-zA-Z0-9-]{2,}(:\d+)?$/;
-    const localhostRegex = /^localhost(:\d+)?$/;
-    const ipRegex = /^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}(:\d+)?$/;
-
-    if (domainRegex.test(input) || localhostRegex.test(input) || ipRegex.test(input)) {
-      return input;
+    if (/[\x00-\x1f\x7f]/.test(raw)) {
+      return { ok: false, category: 'control_chars', error: 'The URL contains invalid control characters. Please remove any newlines, tabs, or non-printable characters.' };
     }
-    return null;
+
+    let parsed;
+    try {
+      let candidate = raw;
+      if (!/^[a-zA-Z][a-zA-Z0-9+.-]*:\/\//.test(raw)) {
+        if (/^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(raw)) {
+          candidate = raw;
+        } else {
+          candidate = 'https://' + raw;
+        }
+      }
+      const portMatch = raw.match(/:\/\/[^/?#]+:(\d+)/);
+      if (portMatch) {
+        const port = parseInt(portMatch[1], 10);
+        if (port < 1 || port > 65535) {
+          return { ok: false, category: 'bad_port', error: 'The URL contains an invalid port number. Ports must be between 1 and 65535.' };
+        }
+      }
+      parsed = new URL(candidate);
+    } catch (e) {
+      return { ok: false, category: 'invalid_url', error: 'The URL could not be parsed. Please verify the format (e.g., yourwebsite.com/path).' };
+    }
+
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+      return { ok: false, category: 'bad_protocol', error: 'Only HTTP and HTTPS URLs are supported. Schemes like file://, javascript:, and data: are not permitted for security reasons.' };
+    }
+
+    if (parsed.username || parsed.password) {
+      return { ok: false, category: 'userinfo', error: 'URLs with embedded credentials (https://user:pass@…) are not allowed. Use the Basic Auth fields in the Advanced panel below instead.' };
+    }
+
+    if (parsed.port !== '' && (parsed.port < 1 || parsed.port > 65535)) {
+      return { ok: false, category: 'bad_port', error: 'The URL contains an invalid port number. Ports must be between 1 and 65535.' };
+    }
+
+    const hostname = parsed.hostname;
+    if (!hostname) {
+      return { ok: false, category: 'bad_hostname', error: 'The URL is missing a hostname. Use a public domain name (e.g., yourwebsite.com).' };
+    }
+
+    const isLocalhost = /^localhost$/.test(hostname);
+    const isIpv4Literal = /^(\d{1,3}\.){3}\d{1,3}$/.test(hostname);
+    const isIpv6Literal = /^[0-9a-fA-F:]+$/.test(hostname) && hostname.includes(':');
+    const isFqdn = /^[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*\.[a-zA-Z]{2,}$/.test(hostname);
+
+    if (!isFqdn && !isLocalhost && !isIpv4Literal && !isIpv6Literal) {
+      return { ok: false, category: 'bad_hostname', error: 'The URL\'s hostname is not valid. Use a public domain name (e.g., yourwebsite.com), a localhost address, or a numeric IP.' };
+    }
+
+    const canonical = `${parsed.protocol}//${parsed.host}${parsed.pathname}${parsed.search}`;
+    return { ok: true, url: canonical, hostname: hostname };
   }
 
   // Form Submit (Audit Trigger)
   scanForm.addEventListener('submit', (e) => {
     e.preventDefault();
-    const rawInput = targetUrlInput.value.trim();
-    if (!rawInput) return;
-
-    const cleanedDomain = cleanAndValidateDomain(rawInput);
-    if (!cleanedDomain) {
-      showError('Please provide a valid website domain name (e.g., yourwebsite.com).');
+    const rawInput = targetUrlInput.value;
+    const result = cleanAndValidateUrl(rawInput);
+    if (!result.ok) {
+      showCategorizedError(result.category, result.error);
       return;
     }
 
-    // Update input value with cleaned domain for visual feedback
-    targetUrlInput.value = cleanedDomain;
-    runAuditScan(cleanedDomain);
+    targetUrlInput.value = result.url;
+    runAuditScan(result.url);
   });
 
   retryBtn.addEventListener('click', () => {
@@ -399,14 +448,54 @@ document.addEventListener('DOMContentLoaded', () => {
     }, 400);
   }
 
-  function showError(msg) {
+  const ERROR_CATEGORIES = {
+    empty:              { icon: 'fa-globe',                    title: 'No URL provided',                border: 'var(--info)' },
+    control_chars:      { icon: 'fa-triangle-exclamation',     title: 'Invalid characters in URL',      border: 'var(--warning)' },
+    invalid_url:        { icon: 'fa-globe',                    title: 'Invalid URL',                    border: 'var(--warning)' },
+    bad_protocol:       { icon: 'fa-shield-halved',            title: 'Unsupported URL scheme',         border: 'var(--warning)' },
+    userinfo:           { icon: 'fa-key',                      title: 'Credentials not allowed in URL', border: 'var(--info)' },
+    bad_port:           { icon: 'fa-globe',                    title: 'Invalid port',                   border: 'var(--warning)' },
+    bad_hostname:       { icon: 'fa-globe',                    title: 'Invalid hostname',               border: 'var(--warning)' },
+    bad_input:          { icon: 'fa-globe',                    title: 'Invalid input',                  border: 'var(--warning)' },
+    private_ip:         { icon: 'fa-shield-halved',            title: 'Private network address detected', border: 'var(--error)' },
+    dns_failure:        { icon: 'fa-link-slash',               title: 'Domain could not be resolved',   border: 'var(--warning)' },
+    too_many_redirects: { icon: 'fa-route',                    title: 'Too many redirects',             border: 'var(--warning)' },
+    connection:         { icon: 'fa-link-slash',               title: 'Connection failed',              border: 'var(--warning)' },
+    security:           { icon: 'fa-shield-halved',            title: 'Security check failed',          border: 'var(--error)' },
+    bad_header:         { icon: 'fa-triangle-exclamation',     title: 'Invalid custom header',          border: 'var(--warning)' },
+    busy:               { icon: 'fa-hourglass-half',           title: 'Server is busy',                 border: 'var(--warning)' },
+    rate_limit:         { icon: 'fa-hourglass-half',           title: 'Rate limit reached',             border: 'var(--warning)' },
+    access_denied:      { icon: 'fa-lock',                     title: 'Access denied',                  border: 'var(--error)' }
+  };
+
+  function showCategorizedError(category, msg) {
     clearInterval(loadingInterval);
     loaderSection.classList.add('hidden');
     errorSection.classList.remove('hidden');
+
+    const meta = ERROR_CATEGORIES[category] || { icon: 'fa-triangle-exclamation', title: 'Audit Scan Failed', border: 'var(--error)' };
+    const errorIcon = document.getElementById('errorIcon');
+    const errorTitle = document.getElementById('errorTitle');
+    const errorCard = document.querySelector('.error-card');
+
+    if (errorIcon) {
+      errorIcon.className = `fa-solid ${meta.icon} error-icon`;
+    }
+    if (errorTitle) {
+      errorTitle.innerText = meta.title;
+    }
+    if (errorCard) {
+      errorCard.style.borderColor = meta.border;
+      errorCard.dataset.category = category;
+    }
     errorMessage.innerText = msg;
-    
+
     targetUrlInput.disabled = false;
     scanBtn.disabled = false;
+  }
+
+  function showError(msg) {
+    showCategorizedError(null, msg);
   }
 
   function showDashboard() {
@@ -496,7 +585,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     
     // 3. Update Badge Totals
-    cookieBadgeCount.innerText = data.summary.totalCookies + (data.summary.totalStorage || 0);
+    storageBadgeCount.innerText = data.summary.totalCookies + (data.summary.totalStorage || 0);
     connBadgeCount.innerText = data.summary.totalRequests;
     
     // 4. Setup Master-Detail Compliance Diagnostics
@@ -507,13 +596,13 @@ document.addEventListener('DOMContentLoaded', () => {
     activeConnFilter = 'all';
     
     // Reset filters active state
-    document.querySelectorAll('#cookieFilters .chip').forEach(c => c.classList.remove('active'));
-    document.querySelector('#cookieFilters [data-filter="all"]').classList.add('active');
+    document.querySelectorAll('#storageFilters .chip').forEach(c => c.classList.remove('active'));
+    document.querySelector('#storageFilters [data-filter="all"]').classList.add('active');
     
     document.querySelectorAll('#connFilters .chip').forEach(c => c.classList.remove('active'));
     document.querySelector('#connFilters [data-filter="all"]').classList.add('active');
     
-    document.getElementById('cookieSearch').value = '';
+    document.getElementById('storageSearch').value = '';
     document.getElementById('connSearch').value = '';
     
     renderCookiesTable();
@@ -1231,14 +1320,14 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // --- COOKIE TAB RENDERING & FILTERS ---
-  const cookieSearch = document.getElementById('cookieSearch');
-  const cookieFilters = document.getElementById('cookieFilters');
+  const storageSearch = document.getElementById('storageSearch');
+  const storageFilters = document.getElementById('storageFilters');
   
-  cookieSearch.addEventListener('input', renderCookiesTable);
-  cookieFilters.addEventListener('click', (e) => {
+  storageSearch.addEventListener('input', renderCookiesTable);
+  storageFilters.addEventListener('click', (e) => {
     if (!e.target.classList.contains('chip')) return;
     
-    document.querySelectorAll('#cookieFilters .chip').forEach(c => c.classList.remove('active'));
+    document.querySelectorAll('#storageFilters .chip').forEach(c => c.classList.remove('active'));
     e.target.classList.add('active');
     activeCookieFilter = e.target.getAttribute('data-filter');
     renderCookiesTable();
@@ -1246,10 +1335,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function renderCookiesTable() {
     if (!currentScanData) return;
-    const tbody = document.querySelector('#cookiesTable tbody');
+    const tbody = document.querySelector('#storageTable tbody');
+    if (!tbody) { console.error('renderCookiesTable: #storageTable tbody not found'); return; }
     tbody.innerHTML = '';
     
-    const searchVal = cookieSearch.value.toLowerCase().trim();
+    const searchVal = storageSearch.value.toLowerCase().trim();
     
     const cookies = (currentScanData.cookies || []).map(c => ({ ...c, isCookie: true }));
     const storage = (currentScanData.storage || []).map(s => ({ ...s, isCookie: false }));
@@ -1270,15 +1360,15 @@ document.addEventListener('DOMContentLoaded', () => {
       );
     }
     
-    const noCookiesMsg = document.getElementById('noCookiesMsg');
+    const noStorageMsg = document.getElementById('noStorageMsg');
     if (allItems.length === 0) {
-      noCookiesMsg.classList.remove('hidden');
-      document.getElementById('cookiesTable').classList.add('hidden');
+      noStorageMsg.classList.remove('hidden');
+      document.getElementById('storageTable').classList.add('hidden');
       return;
     }
     
-    noCookiesMsg.classList.add('hidden');
-    document.getElementById('cookiesTable').classList.remove('hidden');
+    noStorageMsg.classList.add('hidden');
+    document.getElementById('storageTable').classList.remove('hidden');
     
     allItems.forEach(c => {
       const tr = document.createElement('tr');
@@ -1470,7 +1560,13 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   if (queryUrl) {
-    runAuditScan(queryUrl);
+    const queryResult = cleanAndValidateUrl(queryUrl);
+    if (queryResult.ok) {
+      targetUrlInput.value = queryResult.url;
+      runAuditScan(queryResult.url);
+    } else {
+      showCategorizedError(queryResult.category, queryResult.error);
+    }
   }
 
   function parseMarkdown(text) {

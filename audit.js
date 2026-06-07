@@ -2,7 +2,9 @@ import { chromium } from 'playwright';
 import tls from 'tls';
 import fs from 'fs';
 import path from 'path';
+import dns from 'dns';
 import { fileURLToPath } from 'url';
+import { isPrivateIP } from './lib/ssrf-guard.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -31,7 +33,7 @@ function checkTlsSocket(host) {
       const protocol = socket.getProtocol();
       const authorized = socket.authorized;
       const authorizationError = socket.authorizationError;
-      
+
       socket.end();
       resolve({
         success: true,
@@ -41,14 +43,14 @@ function checkTlsSocket(host) {
         authorizationError: authorizationError
       });
     });
-    
+
     socket.on('error', (err) => {
       resolve({
         success: false,
         error: err.message
       });
     });
-    
+
     // Set a short timeout (e.g., 5 seconds) to prevent hanging
     socket.setTimeout(5000);
     socket.on('timeout', () => {
@@ -57,6 +59,24 @@ function checkTlsSocket(host) {
         success: false,
         error: 'Connection timeout'
       });
+    });
+  });
+}
+
+function resolveAndCheckPublic(hostname) {
+  return new Promise((resolve) => {
+    dns.lookup(hostname, { all: true }, (err, addresses) => {
+      if (err) {
+        resolve({ ok: false, reason: 'dns_failure' });
+        return;
+      }
+      for (const a of addresses) {
+        if (isPrivateIP(a.address)) {
+          resolve({ ok: false, reason: 'private_ip', address: a.address });
+          return;
+        }
+      }
+      resolve({ ok: true, addresses: addresses.map(a => a.address) });
     });
   });
 }
@@ -83,6 +103,65 @@ function isSensitiveSessionCookie(name) {
   return n.includes('sess') || n.includes('session') || n.includes('sid') ||
          n.includes('token') || n.includes('auth') || n.includes('login') ||
          n.includes('jwt') || n === 'phpsessid' || n === 'jsessionid' || n === 'aspsessionid';
+}
+
+// Parse a single Set-Cookie header value into a cookie object
+function parseSetCookieValue(str) {
+  try {
+    const parts = str.split(';').map(s => s.trim());
+    if (!parts.length) return null;
+    const nv = parts[0].split('=');
+    const name = (nv[0] || '').trim();
+    if (!name) return null;
+    const value = nv.slice(1).join('=').trim();
+
+    const cookie = { name, value, domain: '', path: '/', secure: false, httpOnly: false, sameSite: 'None', expires: -1 };
+    let hasExpiry = false;
+
+    for (let i = 1; i < parts.length; i++) {
+      const seg = parts[i];
+      const eqIdx = seg.indexOf('=');
+      let attrName, attrValue;
+      if (eqIdx === -1) {
+        attrName = seg.toLowerCase();
+        attrValue = '';
+      } else {
+        attrName = seg.substring(0, eqIdx).toLowerCase().trim();
+        attrValue = seg.substring(eqIdx + 1).trim();
+      }
+
+      switch (attrName) {
+        case 'domain': cookie.domain = attrValue; break;
+        case 'path': cookie.path = attrValue || '/'; break;
+        case 'expires': {
+          const d = new Date(attrValue);
+          if (!isNaN(d.getTime())) {
+            cookie.expires = Math.floor(d.getTime() / 1000);
+            hasExpiry = true;
+          }
+          break;
+        }
+        case 'max-age': {
+          const ma = parseInt(attrValue, 10);
+          if (!isNaN(ma)) {
+            cookie.expires = Math.floor(Date.now() / 1000) + ma;
+            hasExpiry = true;
+          }
+          break;
+        }
+        case 'secure': cookie.secure = true; break;
+        case 'httponly': cookie.httpOnly = true; break;
+        case 'samesite':
+          cookie.sameSite = attrValue.charAt(0).toUpperCase() + attrValue.slice(1).toLowerCase();
+          break;
+      }
+    }
+    // Session cookies (no Expires / Max-Age) must have expires=-1 to match Playwright's format
+    if (!hasExpiry) cookie.expires = -1;
+    return cookie;
+  } catch (e) {
+    return null;
+  }
 }
 
 // Known tracking, advertising, and analytics domains
@@ -369,20 +448,28 @@ function classifyRequest(requestUrl, pageDomain) {
 }
 
 export async function runAudit(targetUrl, options = {}) {
-  // Extract hostname/clean domain
-  let cleanDomain = targetUrl.trim();
-  // Strip protocol if present
-  cleanDomain = cleanDomain.replace(/^https?:\/\//i, '');
-  // Strip trailing path/slash
-  cleanDomain = cleanDomain.split('/')[0];
+  let parsedTarget;
+  try {
+    parsedTarget = new URL(targetUrl);
+  } catch (e) {
+    return {
+      success: false,
+      category: 'invalid_url',
+      url: targetUrl,
+      error: 'The provided URL could not be parsed by the audit engine.'
+    };
+  }
 
-  const httpUrl = 'http://' + cleanDomain;
-  const httpsUrl = 'https://' + cleanDomain;
+  const targetHost = parsedTarget.hostname;
+  const targetPort = parsedTarget.port;
+  const targetOrigin = options.targetOrigin || `${parsedTarget.protocol}//${parsedTarget.host}`;
+  const targetPath = `${parsedTarget.pathname}${parsedTarget.search}` || '/';
+  const httpUrl = 'http://' + parsedTarget.host + targetPath;
+  const httpsUrl = 'https://' + parsedTarget.host + targetPath;
 
   let browser;
   let finalUrl = targetUrl;
   try {
-    const targetHost = cleanDomain;
     const targetBaseDomain = getBaseDomain(targetHost);
 
     // Run the TLS socket check in parallel with browser launch
@@ -407,7 +494,7 @@ export async function runAudit(targetUrl, options = {}) {
       contextOptions.httpCredentials = {
         username: options.authUsername,
         password: options.authPassword,
-        origin: httpsUrl
+        origin: targetOrigin
       };
     }
 
@@ -422,6 +509,7 @@ export async function runAudit(targetUrl, options = {}) {
     let page = await context.newPage();
 
     const requestLogs = [];
+    const responseCookies = [];
     
     const setupPageListeners = (p) => {
       p.on('request', req => {
@@ -430,7 +518,7 @@ export async function runAudit(targetUrl, options = {}) {
         const resourceType = req.resourceType();
         
         // Skip data URLs and main document request
-        if (url.startsWith('data:') || url.startsWith('http://' + cleanDomain) || url.startsWith('https://' + cleanDomain)) return;
+        if (url.startsWith('data:') || url.startsWith('http://' + targetHost) || url.startsWith('https://' + targetHost)) return;
 
         const classification = classifyRequest(url, targetBaseDomain);
 
@@ -440,6 +528,20 @@ export async function runAudit(targetUrl, options = {}) {
           resourceType,
           ...classification
         });
+      });
+      
+      p.on('response', async (res) => {
+        try {
+          const headers = res.headersArray();
+          for (const h of headers) {
+            if (h.name.toLowerCase() === 'set-cookie') {
+              const c = parseSetCookieValue(h.value);
+              if (c) responseCookies.push(c);
+            }
+          }
+        } catch (e) {
+          // Ignore response header parsing errors
+        }
       });
     };
 
@@ -488,6 +590,90 @@ export async function runAudit(targetUrl, options = {}) {
       }
     }
 
+    // Post-navigation re-validation: re-parse the final URL, re-resolve its
+    // hostname, and walk the redirect chain. This catches SSRF bypasses where
+    // an attacker uses DNS rebinding or chained redirects to land on a
+    // private/internal address (e.g. cloud metadata at 169.254.169.254) after
+    // the initial validation has already passed.
+    try {
+      finalUrl = page.url();
+      const maxRedirects = 10;
+      const hops = [];
+      if (mainResponse) {
+        let hopReq = mainResponse.request();
+        while (hopReq) {
+          hops.push(hopReq.url());
+          if (hops.length > maxRedirects + 1) break;
+          hopReq = hopReq.redirectedFrom();
+        }
+      }
+      if (hops.length > maxRedirects + 1) {
+        throw new Error('redirect_limit');
+      }
+
+      for (const hopUrl of hops) {
+        let hopParsed;
+        try {
+          hopParsed = new URL(hopUrl);
+        } catch (e) {
+          throw new Error('bad_redirect_url');
+        }
+        if (hopParsed.protocol !== 'http:' && hopParsed.protocol !== 'https:') {
+          throw new Error('bad_redirect_protocol');
+        }
+        const hopCheck = await resolveAndCheckPublic(hopParsed.hostname);
+        if (!hopCheck.ok) {
+          if (hopCheck.reason === 'private_ip') {
+            throw new Error('redirect_private_ip:' + hopUrl);
+          }
+          throw new Error('redirect_dns_failure:' + hopParsed.hostname);
+        }
+      }
+    } catch (secErr) {
+      const reason = String(secErr.message || secErr);
+      await browser.close();
+      if (reason === 'redirect_limit') {
+        return {
+          success: false,
+          category: 'too_many_redirects',
+          url: targetUrl,
+          error: 'The audited website has more than 10 consecutive redirects. The scan was aborted to prevent resource exhaustion.'
+        };
+      }
+      if (reason === 'bad_redirect_url' || reason === 'bad_redirect_protocol') {
+        return {
+          success: false,
+          category: 'bad_protocol',
+          url: targetUrl,
+          error: 'The audited website redirected to a non-HTTP(S) URL. The scan was aborted for security reasons.'
+        };
+      }
+      if (reason.startsWith('redirect_private_ip:')) {
+        const offending = reason.substring('redirect_private_ip:'.length);
+        return {
+          success: false,
+          category: 'private_ip',
+          url: targetUrl,
+          error: `The audited website redirected to ${offending}, which resolves to a private network address. The scan was aborted to prevent leaking data to internal resources. This usually means the site is misconfigured.`
+        };
+      }
+      if (reason.startsWith('redirect_dns_failure:')) {
+        const host = reason.substring('redirect_dns_failure:'.length);
+        return {
+          success: false,
+          category: 'private_ip',
+          url: targetUrl,
+          error: `A redirect in the audited website's chain (${host}) could not be re-resolved after navigation. The scan was aborted to prevent leaking data to potentially internal resources.`
+        };
+      }
+      return {
+        success: false,
+        category: 'security',
+        url: targetUrl,
+        error: 'Post-navigation security validation failed. The scan was aborted.'
+      };
+    }
+
     // Wait an additional 5 seconds to let async scripts execute and fire trackers
     try {
       await page.waitForTimeout(5000);
@@ -498,8 +684,28 @@ export async function runAudit(targetUrl, options = {}) {
     // Capture final screenshots (optional, but good for reporting)
     // const screenshot = await page.screenshot({ encoding: 'base64' });
 
-    // Collect all cookies set in this context
-    const rawCookies = await context.cookies();
+    // Collect all cookies set in this context.
+    // Some environments (e.g. read-only container filesystems) may prevent
+    // Chromium from persisting cookies to its internal store, causing
+    // context.cookies() to return empty. As a fallback, also capture cookies
+    // from Set-Cookie response headers during navigation.
+    let rawCookies = await context.cookies();
+    if (rawCookies.length === 0 && responseCookies.length > 0) {
+      rawCookies = responseCookies;
+    } else if (rawCookies.length > 0 && responseCookies.length > 0) {
+      // Merge both sources, deduplicating by name + domain (response headers
+      // may capture cookies that context.cookies() misses, e.g. session-scoped).
+      const seen = new Set();
+      const merged = [];
+      for (const c of [...rawCookies, ...responseCookies]) {
+        const key = c.name + '|' + (c.domain || '');
+        if (!seen.has(key)) {
+          seen.add(key);
+          merged.push(c);
+        }
+      }
+      rawCookies = merged;
+    }
 
     // Collect LocalStorage and SessionStorage across all page frames
     const storageItems = [];
@@ -963,6 +1169,7 @@ export async function runAudit(targetUrl, options = {}) {
     if (browser) await browser.close();
     return {
       success: false,
+      category: 'connection',
       url: targetUrl,
       error: error.message || 'Failed to complete the audit scan.'
     };

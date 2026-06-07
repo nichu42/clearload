@@ -5,6 +5,7 @@ import { fileURLToPath } from 'url';
 import rateLimit from 'express-rate-limit';
 import helmet from 'helmet';
 import { runAudit } from './audit.js';
+import { validateAndNormalizeUrl, isPrivateIP } from './lib/ssrf-guard.js';
 import open from 'open';
 import dns from 'dns';
 import crypto from 'crypto';
@@ -113,7 +114,7 @@ app.use(helmet({
     directives: {
       defaultSrc: ["'self'"],
       scriptSrc: ["'self'"],
-      styleSrc: ["'self'"],
+      styleSrc: ["'self'", "'unsafe-inline'"],
       imgSrc: ["'self'", "data:"],
       connectSrc: ["'self'"],
       fontSrc: ["'self'"],
@@ -310,31 +311,7 @@ const scanLimiter = isRateLimitEnabled
 let activeScansCount = 0;
 const maxConcurrentScans = parseInt(process.env.MAX_CONCURRENT_SCANS, 10) || 2;
 
-// 5. SSRF Protection: Check if an IP address is private/internal
-function isPrivateIP(ip) {
-  if (!ip) return false;
-  
-  const parts = ip.split('.').map(Number);
-  if (parts.length !== 4 || parts.some(p => isNaN(p) || p < 0 || p > 255)) {
-    return false;
-  }
-  
-  // Loopback: 127.0.0.0/8
-  if (parts[0] === 127) return true;
-  
-  // Private networks (RFC 1918)
-  if (parts[0] === 10) return true;
-  if (parts[0] === 172 && parts[1] >= 16 && parts[1] <= 31) return true;
-  if (parts[0] === 192 && parts[1] === 168) return true;
-  
-  // Link-local: 169.254.0.0/16 (includes cloud metadata 169.254.169.254)
-  if (parts[0] === 169 && parts[1] === 254) return true;
-  
-  // Current network: 0.0.0.0/8
-  if (parts[0] === 0) return true;
-  
-  return false;
-}
+// 5. SSRF Protection utilities are provided by ./lib/ssrf-guard.js
 
 // API Status endpoint
 app.get('/api/status', (req, res) => {
@@ -390,69 +367,76 @@ app.get('/api/dictionaries', (req, res) => {
 app.post('/api/scan', scanLimiter, async (req, res) => {
   const { url, authUsername, authPassword, customHeaderName, customHeaderValue } = req.body;
 
-  if (!url || typeof url !== 'string' || url.trim() === '') {
+  const validation = validateAndNormalizeUrl(url);
+  if (!validation.ok) {
     return res.status(400).json({
       success: false,
-      error: 'Please provide a valid website domain name (e.g., example.com).'
+      category: validation.category,
+      error: validation.error
     });
   }
 
-  // Clean the input (extract domain name only)
-  let targetDomain = url.trim();
-  // Strip protocol
-  targetDomain = targetDomain.replace(/^https?:\/\//i, '');
-  // Strip path and query parameters
-  targetDomain = targetDomain.split('/')[0];
-  
-  // Validate domain format
-  const domainRegex = /^[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
-  if (!domainRegex.test(targetDomain)) {
-    return res.status(400).json({
-      success: false,
-      error: 'Please provide a valid website domain name (e.g., example.com).'
-    });
-  }
+  const targetUrl = validation.url;
+  const targetHostname = validation.hostname;
 
-  // SSRF Protection: Resolve domain and reject private/internal IPs
+  // SSRF Protection: Resolve hostname and reject private/internal IPs
+  let resolvedAddresses = [];
   try {
-    const { address } = await dns.promises.lookup(targetDomain);
-    if (isPrivateIP(address)) {
-      return res.status(400).json({
-        success: false,
-        error: 'Scanning internal or private network addresses is not permitted.'
-      });
-    }
+    const records = await dns.promises.lookup(targetHostname, { all: true });
+    resolvedAddresses = records.map(r => r.address);
   } catch (dnsError) {
     return res.status(400).json({
       success: false,
+      category: 'dns_failure',
       error: 'Could not resolve the domain name. Please check that the website exists and is publicly reachable.'
     });
+  }
+
+  for (const address of resolvedAddresses) {
+    if (isPrivateIP(address)) {
+      return res.status(400).json({
+        success: false,
+        category: 'private_ip',
+        error: `The hostname ${targetHostname} resolves to a private or internal IP address (${address}). Scanning internal networks is not permitted for security reasons.`
+      });
+    }
   }
 
   // Validate custom header (intended for WAF bypass tokens only)
   if (customHeaderName || customHeaderValue) {
     const headerNameRegex = /^[a-zA-Z0-9-]+$/;
     const blockedHeaders = /^(authorization|cookie|host|proxy-|x-forwarded-|x-real-ip|x-api-key)/i;
-    
+
     if (!customHeaderName || !headerNameRegex.test(customHeaderName)) {
       return res.status(400).json({
         success: false,
+        category: 'bad_header',
         error: 'Invalid custom header name. Only alphanumeric characters and hyphens are allowed.'
       });
     }
-    
+
     if (blockedHeaders.test(customHeaderName)) {
       return res.status(400).json({
         success: false,
+        category: 'bad_header',
         error: 'Sensitive headers like Authorization, Cookie, Host, and Proxy headers are not allowed.'
       });
     }
-    
-    if (customHeaderValue && /[\r\n]/.test(customHeaderValue)) {
-      return res.status(400).json({
-        success: false,
-        error: 'Header values cannot contain newline characters.'
-      });
+
+    if (customHeaderValue) {
+      let decodedValue = customHeaderValue;
+      try {
+        decodedValue = decodeURIComponent(customHeaderValue);
+      } catch (e) {
+        decodedValue = customHeaderValue;
+      }
+      if (/[\r\n]/.test(decodedValue)) {
+        return res.status(400).json({
+          success: false,
+          category: 'bad_header',
+          error: 'Header values cannot contain newline characters (including percent-encoded CRLF).'
+        });
+      }
     }
   }
 
@@ -460,21 +444,24 @@ app.post('/api/scan', scanLimiter, async (req, res) => {
   if (activeScansCount >= maxConcurrentScans) {
     return res.status(503).json({
       success: false,
+      category: 'busy',
       error: 'The server is currently busy processing audits for other websites. Please wait a few seconds and try again.'
     });
   }
 
   try {
     activeScansCount++;
-    const report = await runAudit(targetDomain, { authUsername, authPassword, customHeaderName, customHeaderValue });
+    const report = await runAudit(targetUrl, { authUsername, authPassword, customHeaderName, customHeaderValue, targetOrigin: validation.origin, targetHost: targetHostname });
     if (report.success) {
       res.json(report);
     } else {
-      res.status(500).json(report);
+      const status = report.category === 'private_ip' || report.category === 'too_many_redirects' ? 400 : 500;
+      res.status(status).json(report);
     }
   } catch (error) {
     res.status(500).json({
       success: false,
+      category: 'connection',
       error: error.message || 'The audit scan failed. Please check that the website is online and publicly reachable.'
     });
   } finally {
