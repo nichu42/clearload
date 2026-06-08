@@ -1,6 +1,14 @@
 # Use the official Microsoft Playwright image as the base.
 # It includes Node.js, Chromium, and all system libraries required for headless browser automation.
-FROM mcr.microsoft.com/playwright:v1.60.0-jammy
+FROM mcr.microsoft.com/playwright:v1.60.0-noble
+
+# Remove unused browsers and tools to reduce attack surface.
+# ClearLoad only needs Chromium headless shell + ffmpeg.
+RUN rm -rf /ms-playwright/firefox-* /ms-playwright/webkit-* /ms-playwright/chromium-[0-9]* \
+    && npm uninstall -g yarn \
+    && apt-get remove -y git openssh-client \
+    && apt-get autoremove -y \
+    && rm -rf /var/lib/apt/lists/*
 
 # Set the working directory inside the container
 WORKDIR /app
@@ -8,9 +16,8 @@ WORKDIR /app
 # Copy package files first to leverage Docker build cache
 COPY package*.json ./
 
-# Install npm dependencies. We use npm install --only=production for lightweight builds,
-# but Playwright is required in production, so standard install is fine.
-RUN npm install
+# Install production npm dependencies
+RUN npm ci --omit=dev
 
 # Copy all application files (server.js, audit.js, public/)
 COPY . .

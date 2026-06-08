@@ -1,6 +1,6 @@
 {
   "name": "clearload",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "ClearLoad: Stateless website privacy & cookie security auditor utilizing Playwright and Express",
   "main": "server.js",
   "type": "module",
@@ -15,7 +15,7 @@
     "@fontsource/plus-jakarta-sans": "^5.2.8",
     "@fortawesome/fontawesome-free": "^7.2.0",
     "express": "^5.2.1",
-    "express-rate-limit": "^7.3.1",
+    "express-rate-limit": "^8.5.2",
     "helmet": "^8.2.0",
     "open": "^11.0.0",
     "playwright": "^1.60.0"

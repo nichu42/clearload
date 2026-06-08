@@ -432,7 +432,7 @@ app.post('/api/scan', scanLimiter, async (req, res) => {
   for (const address of resolvedAddresses) {
     if (isPrivateIP(address)) {
       stats.ssrfBlocks++;
-      logger.warn(`[WARN] SSRF blocked: ${targetHostname} resolves to private IP ${address}`);
+      logger.warn(`[WARN] SSRF blocked`);
       return res.status(400).json({
         success: false,
         category: 'private_ip',
@@ -482,7 +482,7 @@ app.post('/api/scan', scanLimiter, async (req, res) => {
   // Concurrency check
   if (activeScansCount >= maxConcurrentScans) {
     stats.concurrencyRejections++;
-    logger.warn(`[WARN] Concurrency limit reached (${activeScansCount}/${maxConcurrentScans}), rejecting scan for ${targetHostname}`);
+    logger.warn(`[WARN] Concurrency limit reached (${activeScansCount}/${maxConcurrentScans}), rejecting scan`);
     return res.status(503).json({
       success: false,
       category: 'busy',
@@ -493,21 +493,21 @@ app.post('/api/scan', scanLimiter, async (req, res) => {
   try {
     activeScansCount++;
     stats.scansStarted++;
-    logger.debug(`[DEBUG] Scan started: ${targetUrl} (${activeScansCount}/${maxConcurrentScans})`);
+    logger.debug(`[DEBUG] Scan started (${activeScansCount}/${maxConcurrentScans})`);
     const report = await runAudit(targetUrl, { authUsername, authPassword, customHeaderName, customHeaderValue, targetOrigin: validation.origin, targetHost: targetHostname });
     if (report.success) {
       stats.scansCompleted++;
-      logger.debug(`[DEBUG] Scan completed: ${targetUrl}`);
+      logger.debug(`[DEBUG] Scan completed (${activeScansCount}/${maxConcurrentScans})`);
       res.json(report);
     } else {
       stats.scansErrored++;
-      logger.warn(`[WARN] Scan returned error for ${targetUrl}: category=${report.category} error="${report.error}"`);
+      logger.warn(`[WARN] Scan error: ${report.category} (${report.error || 'unknown'})`);
       const status = report.category === 'private_ip' || report.category === 'too_many_redirects' ? 400 : 500;
       res.status(status).json(report);
     }
   } catch (error) {
     stats.scansCrashed++;
-    logger.error(`[ERROR] Scan failed for ${targetUrl}: ${error.message}`);
+    logger.error(`[ERROR] Scan crashed: ${error.message}`);
     res.status(500).json({
       success: false,
       category: 'connection',
