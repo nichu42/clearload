@@ -13,6 +13,15 @@ import crypto from 'crypto';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+const LOG_LEVELS = { debug: 0, info: 1, warn: 2, error: 3 };
+const LOG_LEVEL = LOG_LEVELS[process.env.LOG_LEVEL?.toLowerCase()] ?? LOG_LEVELS.info;
+const logger = {
+  debug: (...args) => { if (LOG_LEVEL <= LOG_LEVELS.debug) console.log(...args); },
+  info:  (...args) => { if (LOG_LEVEL <= LOG_LEVELS.info)  console.log(...args); },
+  warn:  (...args) => { if (LOG_LEVEL <= LOG_LEVELS.warn)  console.warn(...args); },
+  error: (...args) => { if (LOG_LEVEL <= LOG_LEVELS.error) console.error(...args); }
+};
+
 // Constant-time string comparison to prevent timing attacks
 function safeCompare(a, b) {
   if (typeof a !== 'string' || typeof b !== 'string') return false;
@@ -102,11 +111,11 @@ function parseTrustProxy(value) {
 const trustProxySetting = parseTrustProxy(process.env.TRUSTED_PROXY);
 app.set('trust proxy', trustProxySetting);
 if (trustProxySetting === true) {
-  console.warn(`[Security] WARNING: TRUSTED_PROXY is set to "${process.env.TRUSTED_PROXY}". This trusts the X-Forwarded-For header from any source, allowing clients to spoof their IP address and bypass rate limiting. Use a specific IP/CIDR (e.g. TRUSTED_PROXY=10.0.0.0/8) or a hop count (e.g. TRUSTED_PROXY=1) instead.`);
+  logger.warn(`[WARN] TRUSTED_PROXY is set to "${process.env.TRUSTED_PROXY}". This trusts the X-Forwarded-For header from any source, allowing clients to spoof their IP address and bypass rate limiting. Use a specific IP/CIDR (e.g. TRUSTED_PROXY=10.0.0.0/8) or a hop count (e.g. TRUSTED_PROXY=1) instead.`);
 } else if (trustProxySetting === false) {
-  console.log(`[Security] Express 'trust proxy' is disabled (TRUSTED_PROXY=${process.env.TRUSTED_PROXY}).`);
+  logger.info(`[INFO] Express 'trust proxy' is disabled (TRUSTED_PROXY=${process.env.TRUSTED_PROXY}).`);
 } else {
-  console.log(`[Security] Express 'trust proxy' set to ${JSON.stringify(trustProxySetting)} (TRUSTED_PROXY env var).`);
+  logger.info(`[INFO] Express 'trust proxy' set to ${JSON.stringify(trustProxySetting)} (TRUSTED_PROXY env var).`);
 }
 
 app.use(helmet({
@@ -167,8 +176,8 @@ app.use('/vendor/fontawesome', longCache, express.static(path.join(__dirname, 'n
 // The middleware below fires for every request path, sets no-store, then
 // either serves a file (public/) or falls through to the /api/* routes.
 // The header stays on the res object for the rest of the chain, so
-// /api/status, /api/dictionaries, /api/scan, and the SPA fallback all
-// inherit it without each handler having to set it.
+// /api/status, /api/dictionaries, and /api/scan all inherit it without
+// each handler having to set it.
 app.use(noStore, express.static(path.join(__dirname, 'public')));
 
 // 1. Validate configured API keys on startup if set
@@ -178,38 +187,38 @@ if (process.env.API_KEY) {
   const keyFormatRegex = /^[a-zA-Z0-9_-]+$/;
   for (const key of keys) {
     if (key.length < 32 || key.length > 128) {
-      console.error(`========================================================================`);
-      console.error(`CRITICAL CONFIGURATION ERROR: Invalid API Key detected!`);
-      console.error(`The API Key "${key.substring(0, 8)}..." does not meet the length requirements.`);
-      console.error(`API keys must be between 32 and 128 characters (current: ${key.length} chars).`);
-      console.error(`Server startup aborted.`);
-      console.error(`========================================================================`);
+      logger.error(`========================================================================`);
+      logger.error(`CRITICAL CONFIGURATION ERROR: Invalid API Key detected!`);
+      logger.error(`The API Key "${key.substring(0, 8)}..." does not meet the length requirements.`);
+      logger.error(`API keys must be between 32 and 128 characters (current: ${key.length} chars).`);
+      logger.error(`Server startup aborted.`);
+      logger.error(`========================================================================`);
       process.exit(1);
     }
     if (!keyFormatRegex.test(key)) {
-      console.error(`========================================================================`);
-      console.error(`CRITICAL CONFIGURATION ERROR: Invalid API Key detected!`);
-      console.error(`The API Key "${key.substring(0, 8)}..." contains invalid characters.`);
-      console.error(`API keys must contain only alphanumeric characters, underscores, and hyphens.`);
-      console.error(`Allowed regex: /^[a-zA-Z0-9_-]+$/`);
-      console.error(`Server startup aborted.`);
-      console.error(`========================================================================`);
+      logger.error(`========================================================================`);
+      logger.error(`CRITICAL CONFIGURATION ERROR: Invalid API Key detected!`);
+      logger.error(`The API Key "${key.substring(0, 8)}..." contains invalid characters.`);
+      logger.error(`API keys must contain only alphanumeric characters, underscores, and hyphens.`);
+      logger.error(`Allowed regex: /^[a-zA-Z0-9_-]+$/`);
+      logger.error(`Server startup aborted.`);
+      logger.error(`========================================================================`);
       process.exit(1);
     }
     expectedApiKeys.push(key);
   }
-  console.log(`[Security] API Key authentication enabled with ${expectedApiKeys.length} configured keys.`);
+  logger.info(`[INFO] API Key authentication enabled with ${expectedApiKeys.length} configured keys.`);
 } else {
-  console.warn(`[Security] WARNING: No API_KEY environment variable configured. Programmatic API access is restricted by default.`);
+  logger.warn(`[WARN] No API_KEY environment variable configured. Programmatic API access is restricted by default.`);
 }
 
 // 2. Trusted Host Configuration for Same-Origin Checks
 const trustedHost = process.env.TRUSTED_HOST;
 if (trustedHost) {
-  console.log(`[Security] Trusted host configured: ${trustedHost}`);
+  logger.info(`[INFO] Trusted host configured: ${trustedHost}`);
 } else {
-  console.warn(`[Security] WARNING: No TRUSTED_HOST environment variable configured. Using Host header from requests (less secure for production deployments).`);
-  console.warn(`[Security] For production deployments, set TRUSTED_HOST=yourdomain.com to prevent Host header spoofing.`);
+  logger.warn(`[WARN] No TRUSTED_HOST environment variable configured. Using Host header from requests (less secure for production deployments).`);
+  logger.warn(`[WARN] For production deployments, set TRUSTED_HOST=yourdomain.com to prevent Host header spoofing.`);
 }
 
 // 3. Security Guard Middleware for API endpoints
@@ -247,6 +256,8 @@ const apiSecurityGuard = (req, res, next) => {
     
     // If an API key was provided but is invalid, reject the request immediately
     if (!hasValidApiKey) {
+      stats.apiDenied++;
+      logger.warn(`[WARN] API access denied: invalid API key`);
       return res.status(403).json({
         success: false,
         error: 'Access denied. The provided API key is invalid.'
@@ -258,6 +269,8 @@ const apiSecurityGuard = (req, res, next) => {
     return next();
   }
 
+  stats.apiDenied++;
+  logger.warn(`[WARN] API access denied: unauthorized origin`);
   return res.status(403).json({
     success: false,
     error: 'Access denied. This server\'s scan API is restricted to authorized requests.'
@@ -282,12 +295,16 @@ const scanLimiter = isRateLimitEnabled
   ? rateLimit({
       windowMs: limitWindowSec * 1000,
       max: rateLimitMax,
-      message: {
-        success: false,
-        error: 'Too many audits have been requested from your IP address. Please wait a few minutes before trying again.'
-      },
       standardHeaders: true,
       legacyHeaders: false,
+      handler: (req, res) => {
+        stats.rateLimitHits++;
+        logger.info(`[INFO] Rate limit exceeded`);
+        res.status(429).json({
+          success: false,
+          error: 'Too many audits have been requested from your IP address. Please wait a few minutes before trying again.'
+        });
+      },
       skip: (req) => {
         // Skip rate-limiting for localhost and valid API keys
         // isLocalRequest uses the socket address, NOT req.ip, so the bypass
@@ -312,6 +329,26 @@ let activeScansCount = 0;
 const maxConcurrentScans = parseInt(process.env.MAX_CONCURRENT_SCANS, 10) || 2;
 
 // 5. SSRF Protection utilities are provided by ./lib/ssrf-guard.js
+
+// 6. Stats aggregation
+const statsIntervalMin = parseInt(process.env.STATS_INTERVAL_MIN, 10) || 0;
+const stats = {
+  scansStarted: 0,
+  scansCompleted: 0,
+  scansErrored: 0,
+  scansCrashed: 0,
+  rateLimitHits: 0,
+  concurrencyRejections: 0,
+  ssrfBlocks: 0,
+  apiDenied: 0
+};
+
+if (statsIntervalMin > 0) {
+  setInterval(() => {
+    logger.info(`[INFO] Stats (last ${statsIntervalMin}m): ${stats.scansStarted} started, ${stats.scansCompleted} completed, ${stats.scansErrored} errored, ${stats.scansCrashed} crashed, ${stats.rateLimitHits} rate-limited, ${stats.concurrencyRejections} concurrency-denied, ${stats.ssrfBlocks} SSRF-blocked, ${stats.apiDenied} API-denied`);
+    Object.keys(stats).forEach(k => stats[k] = 0);
+  }, statsIntervalMin * 60000);
+}
 
 // API Status endpoint
 app.get('/api/status', (req, res) => {
@@ -348,7 +385,7 @@ app.get('/api/dictionaries', (req, res) => {
       const content = fs.readFileSync(filePath, 'utf8');
       result[dict.name] = JSON.parse(content);
     } catch (error) {
-      console.error(`[Error] Failed to load dictionary '${dict.name}': ${error.message}`);
+      logger.error(`[ERROR] Failed to load dictionary '${dict.name}': ${error.message}`);
       failedDicts.push(dict.name);
     }
   }
@@ -394,6 +431,8 @@ app.post('/api/scan', scanLimiter, async (req, res) => {
 
   for (const address of resolvedAddresses) {
     if (isPrivateIP(address)) {
+      stats.ssrfBlocks++;
+      logger.warn(`[WARN] SSRF blocked: ${targetHostname} resolves to private IP ${address}`);
       return res.status(400).json({
         success: false,
         category: 'private_ip',
@@ -442,6 +481,8 @@ app.post('/api/scan', scanLimiter, async (req, res) => {
 
   // Concurrency check
   if (activeScansCount >= maxConcurrentScans) {
+    stats.concurrencyRejections++;
+    logger.warn(`[WARN] Concurrency limit reached (${activeScansCount}/${maxConcurrentScans}), rejecting scan for ${targetHostname}`);
     return res.status(503).json({
       success: false,
       category: 'busy',
@@ -451,14 +492,22 @@ app.post('/api/scan', scanLimiter, async (req, res) => {
 
   try {
     activeScansCount++;
+    stats.scansStarted++;
+    logger.debug(`[DEBUG] Scan started: ${targetUrl} (${activeScansCount}/${maxConcurrentScans})`);
     const report = await runAudit(targetUrl, { authUsername, authPassword, customHeaderName, customHeaderValue, targetOrigin: validation.origin, targetHost: targetHostname });
     if (report.success) {
+      stats.scansCompleted++;
+      logger.debug(`[DEBUG] Scan completed: ${targetUrl}`);
       res.json(report);
     } else {
+      stats.scansErrored++;
+      logger.warn(`[WARN] Scan returned error for ${targetUrl}: category=${report.category} error="${report.error}"`);
       const status = report.category === 'private_ip' || report.category === 'too_many_redirects' ? 400 : 500;
       res.status(status).json(report);
     }
   } catch (error) {
+    stats.scansCrashed++;
+    logger.error(`[ERROR] Scan failed for ${targetUrl}: ${error.message}`);
     res.status(500).json({
       success: false,
       category: 'connection',
@@ -467,11 +516,6 @@ app.post('/api/scan', scanLimiter, async (req, res) => {
   } finally {
     activeScansCount--;
   }
-});
-
-// Fallback to index.html for Single Page App routing
-app.get('/*splat', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
 // Startup log: show every environment variable the server has read and the value
@@ -501,11 +545,11 @@ function summariseConfig() {
 
 app.listen(PORT, () => {
   const url = `http://localhost:${PORT}`;
-  console.log(`ClearLoad server running on ${url}`);
+  logger.info(`ClearLoad server running on ${url}`);
 
-  console.log('[Config] Environment variables processed at startup:');
+  logger.debug('[INFO] Environment variables processed at startup:');
   for (const [name, value] of summariseConfig()) {
-    console.log(`         ${name.padEnd(22)} = ${value}`);
+    logger.debug(`         ${name.padEnd(22)} = ${value}`);
   }
 
   if (process.env.OPEN_BROWSER === 'true') {

@@ -65,6 +65,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const loaderSection = document.getElementById('loaderSection');
   const loaderStatus = document.getElementById('loaderStatus');
   const progressBar = document.getElementById('progressBar');
+  const slowScanNotice = document.getElementById('slowScanNotice');
   
   const errorSection = document.getElementById('errorSection');
   const errorMessage = document.getElementById('errorMessage');
@@ -342,6 +343,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Hide previous UI sections
     dashboardSection.classList.add('hidden');
     errorSection.classList.add('hidden');
+    slowScanNotice.classList.add('hidden');
     loaderSection.classList.remove('hidden');
     
     // Disable inputs
@@ -408,6 +410,10 @@ document.addEventListener('DOMContentLoaded', () => {
         markStepDone('step8', getStepName(8));
         activateStep('step9', getStepName(9));
         loaderStatus.innerText = getLoaderStatusMsg(9);
+      }
+
+      if (elapsedSeconds >= 20 && elapsedSeconds < 20.5) {
+        slowScanNotice.classList.remove('hidden');
       }
     }, 500);
   }

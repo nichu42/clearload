@@ -447,6 +447,16 @@ function classifyRequest(requestUrl, pageDomain) {
   }
 }
 
+const SCAN_TIMEOUT_MS = parseInt(process.env.SCAN_TIMEOUT_MS, 10) || 90000;
+
+function safeCloseBrowser(browser) {
+  if (!browser) return Promise.resolve();
+  return Promise.race([
+    browser.close(),
+    new Promise(resolve => setTimeout(resolve, 5000))
+  ]).catch(() => {});
+}
+
 export async function runAudit(targetUrl, options = {}) {
   let parsedTarget;
   try {
@@ -483,6 +493,12 @@ export async function runAudit(targetUrl, options = {}) {
         '--disable-web-security'
       ]
     });
+
+    let scanTimedOut = false;
+    const scanTimeoutHandle = setTimeout(() => {
+      scanTimedOut = true;
+      safeCloseBrowser(browser);
+    }, SCAN_TIMEOUT_MS);
 
     const contextOptions = {
       userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
@@ -631,7 +647,8 @@ export async function runAudit(targetUrl, options = {}) {
       }
     } catch (secErr) {
       const reason = String(secErr.message || secErr);
-      await browser.close();
+      clearTimeout(scanTimeoutHandle);
+      await safeCloseBrowser(browser);
       if (reason === 'redirect_limit') {
         return {
           success: false,
@@ -923,7 +940,8 @@ export async function runAudit(targetUrl, options = {}) {
       }
     }
 
-    await browser.close();
+    clearTimeout(scanTimeoutHandle);
+    await safeCloseBrowser(browser);
 
     // Compile GDPR compliance diagnostics
     const cookiesCount = analyzedCookies.length;
@@ -1166,7 +1184,16 @@ export async function runAudit(targetUrl, options = {}) {
     };
 
   } catch (error) {
-    if (browser) await browser.close();
+    clearTimeout(scanTimeoutHandle);
+    await safeCloseBrowser(browser);
+    if (scanTimedOut) {
+      return {
+        success: false,
+        category: 'timeout',
+        url: targetUrl,
+        error: `The scan timed out after ${SCAN_TIMEOUT_MS / 1000} seconds. The target website may be unresponsive or extremely slow.`
+      };
+    }
     return {
       success: false,
       category: 'connection',
