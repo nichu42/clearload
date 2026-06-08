@@ -36,12 +36,9 @@ jobs:
           password: ${{ secrets.PACKAGE_TOKEN }}
           registry: codeberg.org
 
-      - name: Build and Push Latest Tag
-        uses: https://codeberg.org/actions/buildah-simple@main
-        with:
-          tag: "codeberg.org/${{ github.repository_owner }}/clearload:latest"
-          context: .
-          push: true
-          username: ${{ github.actor }}
-          password: ${{ secrets.PACKAGE_TOKEN }}
-          registry: codeberg.org
+      - name: Push Latest Tag (re-tag existing image, no rebuild)
+        run: |
+          buildah login -u "${{ github.actor }}" -p "${{ secrets.PACKAGE_TOKEN }}" codeberg.org
+          buildah pull "codeberg.org/${{ github.repository_owner }}/clearload:${{ github.ref_name }}"
+          buildah tag "codeberg.org/${{ github.repository_owner }}/clearload:${{ github.ref_name }}" "codeberg.org/${{ github.repository_owner }}/clearload:latest"
+          buildah push "codeberg.org/${{ github.repository_owner }}/clearload:latest"
