@@ -37,7 +37,11 @@ jobs:
           registry: codeberg.org
 
       - name: Push Latest Tag (re-tag existing image, no rebuild)
+        env:
+          BUILDAH_ISOLATION: chroot
         run: |
+          # Configure buildah storage to use vfs inside the container to prevent hanging
+          printf '[storage]\ndriver="vfs"\nrunroot="/run/containers/storage"\ngraphroot="/var/lib/containers/storage"\n' | tee /etc/containers/storage.conf
           buildah login -u "${{ github.actor }}" -p "${{ secrets.PACKAGE_TOKEN }}" codeberg.org
           buildah pull "codeberg.org/${{ github.repository_owner }}/clearload:${{ github.ref_name }}"
           buildah tag "codeberg.org/${{ github.repository_owner }}/clearload:${{ github.ref_name }}" "codeberg.org/${{ github.repository_owner }}/clearload:latest"
