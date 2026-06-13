@@ -5,7 +5,9 @@ import { fileURLToPath } from 'url';
 import rateLimit from 'express-rate-limit';
 import helmet from 'helmet';
 import { runAudit } from './audit.js';
+import { runCrawl } from './crawl.js';
 import { validateAndNormalizeUrl, isPrivateIP } from './lib/ssrf-guard.js';
+import { RobotsTxt } from './lib/robots-parser.js';
 import open from 'open';
 import dns from 'dns';
 import crypto from 'crypto';
@@ -287,7 +289,7 @@ app.use('/api', (req, res, next) => {
 
 // 3. Rate Limiter Middleware for scan route
 const limitWindowSec = parseInt(process.env.RATE_LIMIT_WINDOW_SEC, 10) || 900;
-const limitMax = parseInt(process.env.RATE_LIMIT_MAX, 10);
+const limitMax = parseInt(process.env.MAX_RATE_LIMIT, 10);
 const isRateLimitEnabled = limitMax !== 0;
 const rateLimitMax = isNaN(limitMax) ? 3 : limitMax;
 
@@ -324,9 +326,64 @@ const scanLimiter = isRateLimitEnabled
     })
   : (req, res, next) => next();
 
+const crawlLimitMax = parseInt(process.env.MAX_CRAWL_RATE_LIMIT, 10);
+const isCrawlRateLimitEnabled = crawlLimitMax !== 0;
+const crawlRateLimitMax = isNaN(crawlLimitMax) ? 1 : crawlLimitMax;
+
+const crawlLimiter = isCrawlRateLimitEnabled
+  ? rateLimit({
+      windowMs: limitWindowSec * 1000,
+      max: crawlRateLimitMax,
+      standardHeaders: true,
+      legacyHeaders: false,
+      handler: (req, res) => {
+        stats.rateLimitHits++;
+        logger.info(`[INFO] Crawl rate limit exceeded`);
+        res.status(429).json({
+          success: false,
+          error: 'Too many site scans have been requested from your IP address. Please wait a few minutes before trying again.'
+        });
+      },
+      skip: (req) => {
+        const isLocalhost = isLocalRequest(req);
+        const apiKey = req.headers['x-api-key'];
+        let hasValidApiKey = false;
+        if (apiKey) {
+          const keyFormatRegex = /^[a-zA-Z0-9_-]+$/;
+          if (apiKey.length >= 32 && apiKey.length <= 128 && keyFormatRegex.test(apiKey)) {
+            hasValidApiKey = expectedApiKeys.some(expected => safeCompare(apiKey, expected));
+          }
+        }
+        return isLocalhost || hasValidApiKey;
+      }
+    })
+  : (req, res, next) => next();
+
 // 4. Concurrency Guard setup
 let activeScansCount = 0;
 const maxConcurrentScans = parseInt(process.env.MAX_CONCURRENT_SCANS, 10) || 2;
+const maxConcurrentCrawls = parseInt(process.env.MAX_CONCURRENT_CRAWLS, 10) || 1;
+const rawMaxCrawlPages = process.env.MAX_CRAWL_PAGES;
+const maxCrawlPages = rawMaxCrawlPages !== undefined ? (isNaN(parseInt(rawMaxCrawlPages, 10)) ? 50 : parseInt(rawMaxCrawlPages, 10)) : 50;
+const maxCrawlDepth = parseInt(process.env.MAX_CRAWL_DEPTH, 10) || 3;
+const crawlPageConcurrency = parseInt(process.env.MAX_CRAWL_CONCURRENCY, 10) || 3;
+const crawlTimeoutMs = (parseInt(process.env.TIMEOUT_CRAWL_SEC, 10) || 300) * 1000;
+let activeCrawlsCount = 0;
+
+const forceRespectRobotsTxt = process.env.FORCE_RESPECT_ROBOTS_TXT === 'true';
+
+// 4.5 Allowed URL Pattern Regex
+const allowedUrlRegexStr = process.env.ALLOWED_URL_REGEX;
+let allowedUrlRegex = null;
+if (allowedUrlRegexStr) {
+  try {
+    allowedUrlRegex = new RegExp(allowedUrlRegexStr);
+    logger.info(`[INFO] Restricting allowed URLs to pattern: ${allowedUrlRegexStr}`);
+  } catch (err) {
+    logger.error(`[ERROR] Invalid ALLOWED_URL_REGEX pattern "${allowedUrlRegexStr}": ${err.message}`);
+    process.exit(1);
+  }
+}
 
 // 5. SSRF Protection utilities are provided by ./lib/ssrf-guard.js
 
@@ -337,6 +394,9 @@ const stats = {
   scansCompleted: 0,
   scansErrored: 0,
   scansCrashed: 0,
+  crawlsStarted: 0,
+  crawlsCompleted: 0,
+  crawlsErrored: 0,
   rateLimitHits: 0,
   concurrencyRejections: 0,
   ssrfBlocks: 0,
@@ -345,7 +405,7 @@ const stats = {
 
 if (statsIntervalMin > 0) {
   setInterval(() => {
-    logger.info(`[INFO] Stats (last ${statsIntervalMin}m): ${stats.scansStarted} started, ${stats.scansCompleted} completed, ${stats.scansErrored} errored, ${stats.scansCrashed} crashed, ${stats.rateLimitHits} rate-limited, ${stats.concurrencyRejections} concurrency-denied, ${stats.ssrfBlocks} SSRF-blocked, ${stats.apiDenied} API-denied`);
+    logger.info(`[INFO] Stats (last ${statsIntervalMin}m): ${stats.scansStarted} started, ${stats.scansCompleted} completed, ${stats.scansErrored} errored, ${stats.scansCrashed} crashed, ${stats.crawlsStarted} crawls-started, ${stats.crawlsCompleted} crawls-completed, ${stats.crawlsErrored} crawls-errored, ${stats.rateLimitHits} rate-limited, ${stats.concurrencyRejections} concurrency-denied, ${stats.ssrfBlocks} SSRF-blocked, ${stats.apiDenied} API-denied`);
     Object.keys(stats).forEach(k => stats[k] = 0);
   }, statsIntervalMin * 60000);
 }
@@ -360,8 +420,11 @@ app.get('/api/status', (req, res) => {
     status: 'ok',
     environment: 'dynamic',
     version: APP_VERSION,
-    footerText: process.env.FOOTER_TEXT !== undefined ? process.env.FOOTER_TEXT : 'presented by (42bit.io)[42bit.io]',
-    legalLink: process.env.LEGAL_LINK || null
+    footerText: process.env.FOOTER_TEXT !== undefined ? process.env.FOOTER_TEXT : 'presented by [42bit.io](https://42bit.io)',
+    legalLink: process.env.LEGAL_LINK || null,
+    forceRespectRobotsTxt,
+    maxCrawlPages,
+    hasApiKeysConfigured: expectedApiKeys.length > 0
   });
 });
 
@@ -416,6 +479,14 @@ app.post('/api/scan', scanLimiter, async (req, res) => {
   const targetUrl = validation.url;
   const targetHostname = validation.hostname;
 
+  if (allowedUrlRegex && !allowedUrlRegex.test(targetUrl)) {
+    return res.status(400).json({
+      success: false,
+      category: 'url_disallowed',
+      error: 'The requested URL is not allowed to be audited under this server\'s configuration.'
+    });
+  }
+
   // SSRF Protection: Resolve hostname and reject private/internal IPs
   let resolvedAddresses = [];
   try {
@@ -438,6 +509,27 @@ app.post('/api/scan', scanLimiter, async (req, res) => {
         category: 'private_ip',
         error: `The hostname ${targetHostname} resolves to a private or internal IP address (${address}). Scanning internal networks is not permitted for security reasons.`
       });
+    }
+  }
+
+  // Robots.txt enforcement check (server level force-respect)
+  if (forceRespectRobotsTxt) {
+    try {
+      const robotsRes = await fetch(`${validation.origin}/robots.txt`, { signal: AbortSignal.timeout(5000) });
+      if (robotsRes.ok) {
+        const text = await robotsRes.text();
+        const robots = new RobotsTxt(text);
+        const parsed = new URL(targetUrl);
+        if (!robots.isAllowed(parsed.pathname + parsed.search, 'clearload')) {
+          return res.status(400).json({
+            success: false,
+            category: 'robots_disallowed',
+            error: 'This URL is disallowed by the website\'s robots.txt policy, and this server is configured to strictly respect robots.txt.'
+          });
+        }
+      }
+    } catch (e) {
+      // Ignore robots.txt fetch errors
     }
   }
 
@@ -518,6 +610,202 @@ app.post('/api/scan', scanLimiter, async (req, res) => {
   }
 });
 
+// Crawl endpoint
+app.post('/api/crawl', crawlLimiter, async (req, res) => {
+  let { url, authUsername, authPassword, customHeaderName, customHeaderValue, discoveryMethod, maxDepth, maxPages, respectRobotsTxt } = req.body;
+
+  const validation = validateAndNormalizeUrl(url);
+  if (!validation.ok) {
+    return res.status(400).json({
+      success: false,
+      category: validation.category,
+      error: validation.error
+    });
+  }
+
+  const targetUrl = validation.url;
+  const targetHostname = validation.hostname;
+
+  if (allowedUrlRegex && !allowedUrlRegex.test(targetUrl)) {
+    return res.status(400).json({
+      success: false,
+      category: 'url_disallowed',
+      error: 'The requested URL is not allowed to be audited under this server\'s configuration.'
+    });
+  }
+
+  // SSRF Protection: Resolve hostname and reject private/internal IPs
+  let resolvedAddresses = [];
+  try {
+    const records = await dns.promises.lookup(targetHostname, { all: true });
+    resolvedAddresses = records.map(r => r.address);
+  } catch (dnsError) {
+    return res.status(400).json({
+      success: false,
+      category: 'dns_failure',
+      error: 'Could not resolve the domain name. Please check that the website exists and is publicly reachable.'
+    });
+  }
+
+  for (const address of resolvedAddresses) {
+    if (isPrivateIP(address)) {
+      stats.ssrfBlocks++;
+      logger.warn(`[WARN] SSRF blocked`);
+      return res.status(400).json({
+        success: false,
+        category: 'private_ip',
+        error: `The hostname ${targetHostname} resolves to a private or internal IP address (${address}). Scanning internal networks is not permitted for security reasons.`
+      });
+    }
+  }
+
+  // Validate custom header
+  if (customHeaderName || customHeaderValue) {
+    const headerNameRegex = /^[a-zA-Z0-9-]+$/;
+    const blockedHeaders = /^(authorization|cookie|host|proxy-|x-forwarded-|x-real-ip|x-api-key)/i;
+
+    if (!customHeaderName || !headerNameRegex.test(customHeaderName)) {
+      return res.status(400).json({
+        success: false,
+        category: 'bad_header',
+        error: 'Invalid custom header name. Only alphanumeric characters and hyphens are allowed.'
+      });
+    }
+
+    if (blockedHeaders.test(customHeaderName)) {
+      return res.status(400).json({
+        success: false,
+        category: 'bad_header',
+        error: 'Sensitive headers like Authorization, Cookie, Host, and Proxy headers are not allowed.'
+      });
+    }
+
+    if (customHeaderValue) {
+      let decodedValue = customHeaderValue;
+      try {
+        decodedValue = decodeURIComponent(customHeaderValue);
+      } catch (e) {
+        decodedValue = customHeaderValue;
+      }
+      if (/[\r\n]/.test(decodedValue)) {
+        return res.status(400).json({
+          success: false,
+          category: 'bad_header',
+          error: 'Header values cannot contain newline characters (including percent-encoded CRLF).'
+        });
+      }
+    }
+  }
+
+  // Validate crawl params
+  if (discoveryMethod && !['auto', 'sitemap', 'crawl'].includes(discoveryMethod)) {
+    discoveryMethod = 'auto';
+  }
+
+  let depth = parseInt(maxDepth, 10);
+  if (isNaN(depth) || depth < 1 || depth > maxCrawlDepth) {
+    depth = 2;
+  }
+
+  const isLocalhost = isLocalRequest(req);
+  const apiKey = req.headers['x-api-key'];
+  let hasValidApiKey = false;
+  if (apiKey) {
+    const keyFormatRegex = /^[a-zA-Z0-9_-]+$/;
+    if (apiKey.length >= 32 && apiKey.length <= 128 && keyFormatRegex.test(apiKey)) {
+      hasValidApiKey = expectedApiKeys.some(expected => safeCompare(apiKey, expected));
+    }
+  }
+  const isBypassed = isLocalhost || hasValidApiKey;
+
+  if (maxCrawlPages === 0 && !isBypassed) {
+    return res.status(403).json({
+      success: false,
+      category: 'disabled',
+      error: 'Multi-page site auditing is disabled on this server. Only single-page scanning is permitted.'
+    });
+  }
+
+  let pages = parseInt(maxPages, 10);
+  if (isNaN(pages) || pages < 2) {
+    pages = 25;
+  } else if (maxCrawlPages > 0 && !isBypassed && pages > maxCrawlPages) {
+    pages = maxCrawlPages;
+  }
+
+  // Concurrency check
+  if (activeCrawlsCount >= maxConcurrentCrawls) {
+    stats.concurrencyRejections++;
+    logger.warn(`[WARN] Crawl concurrency limit reached (${activeCrawlsCount}/${maxConcurrentCrawls}), rejecting crawl`);
+    return res.status(503).json({
+      success: false,
+      category: 'busy',
+      error: 'The server is currently busy processing crawls for other websites. Please wait a few seconds and try again.'
+    });
+  }
+
+  // Set headers for streaming NDJSON
+  res.setHeader('Content-Type', 'application/x-ndjson');
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, private');
+  res.setHeader('X-Accel-Buffering', 'no');
+  res.setHeader('Transfer-Encoding', 'chunked');
+
+  const abortController = new AbortController();
+  req.on('close', () => {
+    abortController.abort();
+  });
+
+  try {
+    activeCrawlsCount++;
+    stats.crawlsStarted++;
+    logger.debug(`[DEBUG] Crawl started (${activeCrawlsCount}/${maxConcurrentCrawls})`);
+
+    let resolvedRespectRobotsTxt = false;
+    if (forceRespectRobotsTxt) {
+      resolvedRespectRobotsTxt = true;
+    } else {
+      resolvedRespectRobotsTxt = respectRobotsTxt === true || respectRobotsTxt === 'true';
+    }
+
+    const result = await runCrawl(targetUrl, {
+      discoveryMethod,
+      maxDepth: depth,
+      maxPages: pages,
+      concurrency: crawlPageConcurrency,
+      authUsername,
+      authPassword,
+      customHeaderName,
+      customHeaderValue,
+      respectRobotsTxt: resolvedRespectRobotsTxt,
+      signal: abortController.signal
+    }, (event) => {
+      res.write(JSON.stringify(event) + '\n');
+    });
+
+    if (result.success) {
+      stats.crawlsCompleted++;
+      logger.debug(`[DEBUG] Crawl completed (${activeCrawlsCount}/${maxConcurrentCrawls})`);
+    } else {
+      stats.crawlsErrored++;
+      logger.warn(`[WARN] Crawl error: ${result.category} (${result.error || 'unknown'})`);
+    }
+  } catch (error) {
+    stats.crawlsErrored++;
+    logger.error(`[ERROR] Crawl crashed: ${error.message}`);
+    res.write(JSON.stringify({
+      event: 'crawl_failed',
+      data: {
+        success: false,
+        category: 'connection',
+        error: error.message || 'The crawl failed. Please check that the website is online and reachable.'
+      }
+    }) + '\n');
+  } finally {
+    activeCrawlsCount--;
+    res.end();
+  }
+});
+
 // Startup log: show every environment variable the server has read and the value
 // (or effective value, after defaults) that will be used at runtime. Useful for
 // verifying deployment configuration without redeploying to test each variable.
@@ -527,19 +815,28 @@ function summariseConfig() {
   const footerRaw = process.env.FOOTER_TEXT;
   const footerDisplay = footerRaw !== undefined
     ? (footerRaw.length > 80 ? `"${footerRaw.slice(0, 80)}…"` : `"${footerRaw}"`)
-    : '(default: "presented by (42bit.io)[42bit.io]")';
+    : '(default: "presented by [42bit.io](https://42bit.io)")';
   return [
-    ['PORT',                process.env.PORT || '3000 (default)'],
+    ['ALLOWED_URL_REGEX',   allowedUrlRegexStr || '(not set — any URL can be scanned)'],
+    ['API_KEY',             apiKeyCount > 0 ? `**** (${apiKeyCount} key${apiKeyCount === 1 ? '' : 's'} loaded)` : '(not set — same-origin/localhost only)'],
+    ['FOOTER_TEXT',         footerDisplay],
+    ['FORCE_RESPECT_ROBOTS_TXT',   String(forceRespectRobotsTxt)],
+    ['LEGAL_LINK',          process.env.LEGAL_LINK || '(not set — link hidden)'],
+    ['MAX_CONCURRENT_CRAWLS', String(maxConcurrentCrawls)],
+    ['MAX_CONCURRENT_SCANS', String(maxConcurrentScans)],
+    ['MAX_CRAWL_CONCURRENCY', String(crawlPageConcurrency)],
+    ['MAX_CRAWL_DEPTH',       String(maxCrawlDepth)],
+    ['MAX_CRAWL_PAGES',       maxCrawlPages === 0 ? '0 (site audit disabled)' : (maxCrawlPages === -1 ? '-1 (unrestricted)' : String(maxCrawlPages))],
+    ['MAX_CRAWL_RATE_LIMIT',  isCrawlRateLimitEnabled ? String(crawlRateLimitMax) : '0 (rate limiting disabled)'],
+    ['MAX_RATE_LIMIT',      isRateLimitEnabled ? String(rateLimitMax) : '0 (rate limiting disabled)'],
     ['NODE_ENV',            process.env.NODE_ENV || '(not set)'],
+    ['OPEN_BROWSER',        process.env.OPEN_BROWSER || '(not set)'],
+    ['PORT',                process.env.PORT || '3000 (default)'],
+    ['RATE_LIMIT_WINDOW_SEC', String(limitWindowSec)],
+    ['TIMEOUT_CRAWL_SEC',     `${crawlTimeoutMs / 1000}s`],
+    ['TIMEOUT_SCAN_SEC',      process.env.TIMEOUT_SCAN_SEC ? `${process.env.TIMEOUT_SCAN_SEC}s` : '90s (default)'],
     ['TRUSTED_HOST',        process.env.TRUSTED_HOST || '(not set)'],
     ['TRUSTED_PROXY',       process.env.TRUSTED_PROXY !== undefined ? process.env.TRUSTED_PROXY : '1 (default)'],
-    ['API_KEY',             apiKeyCount > 0 ? `**** (${apiKeyCount} key${apiKeyCount === 1 ? '' : 's'} loaded)` : '(not set — same-origin/localhost only)'],
-    ['RATE_LIMIT_WINDOW_SEC', String(limitWindowSec)],
-    ['RATE_LIMIT_MAX',      isRateLimitEnabled ? String(rateLimitMax) : '0 (rate limiting disabled)'],
-    ['MAX_CONCURRENT_SCANS', String(maxConcurrentScans)],
-    ['FOOTER_TEXT',         footerDisplay],
-    ['LEGAL_LINK',          process.env.LEGAL_LINK || '(not set — link hidden)'],
-    ['OPEN_BROWSER',        process.env.OPEN_BROWSER || '(not set)'],
   ];
 }
 
@@ -552,7 +849,7 @@ app.listen(PORT, () => {
     logger.debug(`         ${name.padEnd(22)} = ${value}`);
   }
 
-  if (process.env.OPEN_BROWSER === 'true') {
+  if (process.env.OPEN_BROWSER === 'true' && process.env.NODE_ENV !== 'production') {
     open(url).catch(() => {
       // Fail silently if browser cannot be opened automatically
     });

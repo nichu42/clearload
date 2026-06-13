@@ -46,7 +46,17 @@
 
                     <!-- Input Bar -->
                     <div class="search-container">
-                        <form id="scanForm" class="scan-form">
+                        <!-- Scan Mode Toggle -->
+                    <div class="scan-mode-toggle" id="scan-mode-toggle">
+                        <button class="mode-btn active" data-mode="single" id="mode-single" type="button">
+                            <i class="fa-solid fa-file"></i> Page Audit
+                        </button>
+                        <button class="mode-btn" data-mode="crawl" id="mode-crawl" type="button">
+                            <i class="fa-solid fa-sitemap"></i> Site Audit
+                        </button>
+                    </div>
+
+                    <form id="scanForm" class="scan-form">
                             <div class="input-wrapper">
                                 <i class="fa-solid fa-globe input-icon"></i>
                                 <input
@@ -70,7 +80,7 @@
                                 id="scanBtn"
                                 class="primary-btn"
                             >
-                                <span>Run Audit Scan</span>
+                                <span>Scan Page</span>
                                 <i class="fa-solid fa-arrow-right"></i>
                             </button>
                         </form>
@@ -140,6 +150,55 @@
                                         placeholder="e.g. clearload_api_key_..."
                                         autocomplete="off"
                                     />
+                                </div>
+
+                                <!-- Crawl Options (Shown in Crawl mode) -->
+                                <div id="crawlOptionsGroup" class="crawl-options-group hidden" style="grid-column: 1 / -1; display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-top: 1rem; border-top: 1px solid var(--panel-border); padding-top: 1rem;">
+                                    <div class="input-group">
+                                        <label for="discoveryMethod">
+                                            Page Discovery
+                                            <i class="fa-solid fa-circle-info" title="Choose how pages are discovered: Auto-detect tries sitemaps first, Sitemap only ignores links, Follow links only ignores sitemaps."></i>
+                                        </label>
+                                        <select id="discoveryMethod" class="select-input">
+                                            <option value="auto">Auto-detect (Sitemap &rarr; Links)</option>
+                                            <option value="sitemap">Sitemap only</option>
+                                            <option value="crawl">Follow links only</option>
+                                        </select>
+                                    </div>
+                                    <div class="input-group" id="crawlDepthGroup">
+                                        <label for="crawlDepth">
+                                            Crawl Depth
+                                            <i class="fa-solid fa-circle-info" title="Max link clicks deep to follow from the root URL. (Only applicable to link-following modes)."></i>
+                                        </label>
+                                        <select id="crawlDepth" class="select-input">
+                                            <option value="1">1 (Direct links only)</option>
+                                            <option value="2" selected>2 (Default)</option>
+                                            <option value="3">3 (Deep scan)</option>
+                                        </select>
+                                    </div>
+                                    <div class="input-group">
+                                        <label for="maxPages">
+                                            Max Pages <span id="maxPagesLimitText" style="color: var(--accent-color); font-weight: normal; margin-left: 4px; font-size: 0.72rem; opacity: 0.85;"></span>
+                                            <i class="fa-solid fa-circle-info" title="Cap the total number of pages scanned."></i>
+                                        </label>
+                                        <input
+                                            type="number"
+                                            id="maxPages"
+                                            value="25"
+                                            min="2"
+                                            max="100"
+                                        />
+                                    </div>
+                                    <div class="input-group" id="respectRobotsTxtGroup">
+                                        <label for="respectRobotsTxt">
+                                            Respect robots.txt
+                                            <i class="fa-solid fa-circle-info" title="Choose whether to obey robots.txt Disallow rules during crawl."></i>
+                                        </label>
+                                        <select id="respectRobotsTxt" class="select-input">
+                                            <option value="false" selected>No (Ignore disallow rules)</option>
+                                            <option value="true">Yes (Obey disallow rules)</option>
+                                        </select>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -225,8 +284,161 @@
                     </div>
                 </section>
 
+                <!-- Crawl Progress Section -->
+                <section id="crawlProgressSection" class="crawl-progress-section hidden">
+                    <div class="glass-card crawl-progress-card">
+                        <div class="progress-header">
+                            <div class="progress-title-row">
+                                <div class="header-main-info">
+                                    <h3>Scanning Site...</h3>
+                                    <p id="crawlProgressBaseUrl" class="crawl-url-subtitle" style="margin-top: 0.25rem; font-size: 0.9rem; color: var(--text-secondary);"></p>
+                                </div>
+                                <div id="discoveryStatusBadge" class="status-badge badge-info">Initializing...</div>
+                            </div>
+                            <button id="cancelCrawlBtn" class="danger-btn outline-btn" type="button">
+                                <i class="fa-solid fa-ban"></i> Cancel Scan
+                            </button>
+                        </div>
+
+                        <!-- Progress Bar -->
+                        <div class="progress-bar-container">
+                            <div id="crawlProgressBar" class="progress-bar" style="width: 0%"></div>
+                        </div>
+                        <div class="progress-stats-row">
+                            <span id="crawlProgressText">0 / 0 Pages scanned</span>
+                            <span id="crawlRunningStats"><strong class="text-success">0</strong> compliant // <strong class="text-danger">0</strong> issues</span>
+                        </div>
+
+                        <!-- Live Pages Scroll list -->
+                        <div class="live-pages-list-container">
+                            <h4>Scan Activity Log</h4>
+                            <div id="livePagesList" class="live-pages-list">
+                                <!-- entries added dynamically -->
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Crawl Overview Section -->
+                <section id="crawlOverviewSection" class="crawl-overview-section hidden">
+                    <!-- Header Card -->
+                    <div class="glass-card crawl-overview-header-card">
+                        <div class="crawl-header-title">
+                            <div class="header-main-info">
+                                <h2>Site Audit Results</h2>
+                                <p id="crawlOverviewRootUrl" class="crawl-url-subtitle"></p>
+                            </div>
+                            <button id="newCrawlScanBtn" class="primary-btn" type="button">
+                                <i class="fa-solid fa-rotate-left"></i> <span>New Scan</span>
+                            </button>
+                        </div>
+                        <div class="crawl-meta-grid">
+                            <div class="meta-item">
+                                <span class="meta-label">Discovery Method</span>
+                                <span id="crawlMetaDiscovery" class="meta-value badge">Auto</span>
+                            </div>
+                            <div class="meta-item">
+                                <span class="meta-label">Scope Containment</span>
+                                <span id="crawlMetaScope" class="meta-value">Domain lock</span>
+                            </div>
+                            <div class="meta-item">
+                                <span class="meta-label">Scan Duration</span>
+                                <span id="crawlMetaDuration" class="meta-value">0.0s</span>
+                            </div>
+                            <div class="meta-item">
+                                <span class="meta-label">Timestamp</span>
+                                <span id="crawlMetaTimestamp" class="meta-value">-</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Summary Stats Grid -->
+                    <div class="crawl-stats-grid">
+                        <div class="glass-card stat-card border-security">
+                            <div class="stat-info" style="width: 100%;">
+                                <span class="stat-label">Pages Scanned / Detected</span>
+                                <div id="crawlStatPages" class="stat-value">0</div>
+                                <span id="crawlStatPagesDesc" class="stat-desc">Completed successfully</span>
+                                <div id="crawlStatPagesSkips" class="stat-skips-container hidden"></div>
+                            </div>
+                        </div>
+                        <div class="glass-card stat-card border-compliance">
+                            <div class="stat-info" style="width: 100%;">
+                                <span class="stat-label">Compliant Pages</span>
+                                <div id="crawlStatCompliant" class="stat-value text-success">0</div>
+                                <span id="crawlStatCompliantDesc" class="stat-desc">Zero GDPR violations</span>
+                            </div>
+                        </div>
+                        <div class="glass-card stat-card border-marketing">
+                            <div class="stat-info" style="width: 100%;">
+                                <span class="stat-label">Issues Detected</span>
+                                <div id="crawlStatIssues" class="stat-value text-danger">0</div>
+                                <span id="crawlStatIssuesDesc" class="stat-desc">Across all pages</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Top Issues & Pages List Grid -->
+                    <div class="crawl-details-layout">
+                        <!-- Left column: Top Issues -->
+                        <div class="glass-card top-issues-card">
+                            <h3>Top Site Violations</h3>
+                            <p class="section-desc">Common compliance violations ranked by how many pages they appear on.</p>
+                            <div id="topIssuesList" class="top-issues-list">
+                                <!-- populated dynamically -->
+                            </div>
+                        </div>
+
+                        <!-- Right column: Pages table -->
+                        <div class="glass-card pages-list-card">
+                            <div class="table-header-row">
+                                <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
+                                    <h3>Audited Pages</h3>
+                                    <span id="violationFilterBadge" class="filter-badge hidden">
+                                        <span>Filter: <strong id="violationFilterName"></strong></span>
+                                        <button id="clearViolationFilterBtn" class="clear-filter-btn" type="button" title="Clear violation filter">&times;</button>
+                                    </span>
+                                </div>
+                                <div class="table-filters" id="tableFilters">
+                                    <button class="filter-btn active" data-filter="all">All</button>
+                                    <button class="filter-btn" data-filter="compliant">Compliant</button>
+                                    <button class="filter-btn" data-filter="warning" id="filterBtnWarning">Warnings</button>
+                                    <button class="filter-btn" data-filter="non-compliant">Non-Compliant</button>
+                                    <button class="filter-btn" data-filter="failed">Failed</button>
+                                </div>
+                            </div>
+                            <div class="table-container">
+                                <table class="pages-table" id="pagesTable">
+                                    <thead>
+                                        <tr>
+                                            <th>Status</th>
+                                            <th>Page path</th>
+                                            <th>Violations</th>
+                                            <th>Cookie Issues</th>
+                                            <th>Third-Party Requests</th>
+                                            <th>Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="pagesTableBody">
+                                        <!-- populated dynamically -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
                 <!-- Dashboard Results Section -->
                 <section id="dashboardSection" class="dashboard-section hidden">
+                    <div class="crawl-breadcrumb" id="crawl-breadcrumb" style="display:none">
+                        <button class="breadcrumb-back" id="back-to-overview" type="button">
+                            <i class="fa-solid fa-arrow-left"></i> Back to Site Overview
+                        </button>
+                        <span class="breadcrumb-separator">—</span>
+                        <span class="breadcrumb-page" id="breadcrumb-page-url"></span>
+                    </div>
+
+                    
                     <!-- Quick Overview Row -->
                     <!-- Binary Compliance Card (Full Width Banner) -->
                     <div

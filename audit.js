@@ -447,7 +447,7 @@ function classifyRequest(requestUrl, pageDomain) {
   }
 }
 
-const SCAN_TIMEOUT_MS = parseInt(process.env.SCAN_TIMEOUT_MS, 10) || 90000;
+const SCAN_TIMEOUT_MS = (parseInt(process.env.TIMEOUT_SCAN_SEC, 10) || 90) * 1000;
 
 function safeCloseBrowser(browser) {
   if (!browser) return Promise.resolve();
@@ -457,7 +457,60 @@ function safeCloseBrowser(browser) {
   ]).catch(() => {});
 }
 
-export async function runAudit(targetUrl, options = {}) {
+
+function filterLinksToScope(rawLinks, scope) {
+  const { domain, basePath, wwwEquivalent } = scope;
+  const normalizedDomain = domain.toLowerCase();
+  const normalizedWwwEquivalent = wwwEquivalent ? wwwEquivalent.toLowerCase() : null;
+  
+  // Ensure basePath ends with a slash for prefix matching
+  const normalizedBasePath = basePath.endsWith('/') ? basePath : basePath + '/';
+
+  const excludedExtensions = new Set([
+    'pdf', 'zip', 'png', 'jpg', 'jpeg', 'gif', 'svg', 'css', 'js',
+    'woff', 'woff2', 'ttf', 'eot', 'xml', 'json', 'mp3', 'mp4',
+    'avi', 'mov'
+  ]);
+
+  const resultUrls = new Set();
+
+  for (const rawUrl of rawLinks) {
+    try {
+      const url = new URL(rawUrl);
+      const urlHost = url.hostname.toLowerCase();
+      
+      // Hostname check (treat www/non-www as equivalent if configured)
+      const hostMatch = urlHost === normalizedDomain || (normalizedWwwEquivalent && urlHost === normalizedWwwEquivalent);
+      if (!hostMatch) continue;
+
+      // Path prefix check
+      const urlPath = url.pathname;
+      let normalizedPath = urlPath;
+      if (normalizedPath.length > 1 && normalizedPath.endsWith('/')) {
+        normalizedPath = normalizedPath.slice(0, -1);
+      }
+
+      const pathWithTrailing = urlPath.endsWith('/') ? urlPath : urlPath + '/';
+      if (!pathWithTrailing.startsWith(normalizedBasePath)) {
+        continue;
+      }
+
+      // Exclude file extensions
+      const ext = urlPath.split('.').pop().toLowerCase();
+      if (excludedExtensions.has(ext)) {
+        continue;
+      }
+
+      const finalUrl = `${url.protocol}//${url.host}${normalizedPath}`;
+      resultUrls.add(finalUrl);
+    } catch (e) {
+      // Ignore invalid URLs
+    }
+  }
+
+  return Array.from(resultUrls);
+}
+export async function runAuditWithBrowser(browser, targetUrl, options = {}) {
   let parsedTarget;
   try {
     parsedTarget = new URL(targetUrl);
@@ -477,29 +530,23 @@ export async function runAudit(targetUrl, options = {}) {
   const httpUrl = 'http://' + parsedTarget.host + targetPath;
   const httpsUrl = 'https://' + parsedTarget.host + targetPath;
 
-  let browser;
   let finalUrl = targetUrl;
+  let context;
+  let scanTimeoutHandle;
+  let scanTimedOut = false;
   try {
     const targetBaseDomain = getBaseDomain(targetHost);
 
-    // Run the TLS socket check in parallel with browser launch
-    const tlsCheckPromise = checkTlsSocket(targetHost);
+    // Run the TLS socket check in parallel with browser launch (or reuse cached TLS check)
+    const tlsCheckPromise = options.cachedTlsResult 
+      ? Promise.resolve(options.cachedTlsResult) 
+      : checkTlsSocket(targetHost);
 
-    // Launch Playwright Headless Chromium
-    browser = await chromium.launch({
-      headless: true,
-      args: [
-        '--no-sandbox',
-        '--disable-setuid-sandbox',
-        '--disable-dev-shm-usage',
-        '--disable-web-security'
-      ]
-    });
-
-    let scanTimedOut = false;
-    const scanTimeoutHandle = setTimeout(() => {
+    scanTimeoutHandle = setTimeout(() => {
       scanTimedOut = true;
-      safeCloseBrowser(browser);
+      if (context) {
+        context.close().catch(() => {});
+      }
     }, SCAN_TIMEOUT_MS);
 
     const contextOptions = {
@@ -522,7 +569,7 @@ export async function runAudit(targetUrl, options = {}) {
       };
     }
 
-    const context = await browser.newContext(contextOptions);
+    context = await browser.newContext(contextOptions);
 
     let page = await context.newPage();
 
@@ -565,33 +612,18 @@ export async function runAudit(targetUrl, options = {}) {
 
     setupPageListeners(page);
 
-    // Try HTTP first
     let navigatedSuccessfully = false;
     let mainResponse = null;
+    let httpFailed = false;
 
-    try {
-      mainResponse = await page.goto(httpUrl, {
-        waitUntil: 'load',
-        timeout: 30000
-      });
-      navigatedSuccessfully = true;
-    } catch (error) {
-      // HTTP failed, will fallback to HTTPS
-    }
-
-    const httpFailed = !navigatedSuccessfully;
-
-    // If HTTP failed completely, fallback to direct HTTPS
-    if (!navigatedSuccessfully) {
+    if (options.skipHttpFallback) {
+      httpFailed = !!options.cachedHttpFailed;
       try {
-        await page.close();
-        page = await context.newPage();
-        setupPageListeners(page);
-
-        mainResponse = await page.goto(httpsUrl, {
+        mainResponse = await page.goto(targetUrl, {
           waitUntil: 'load',
           timeout: 30000
         });
+        navigatedSuccessfully = true;
       } catch (error) {
         const msg = error.message || '';
         const name = error.name || '';
@@ -601,9 +633,50 @@ export async function runAudit(targetUrl, options = {}) {
                           msg.includes('TIMED_OUT') ||
                           msg.includes('timed_out');
         if (isTimeout) {
-          // Proceed with analysis after HTTPS timeout
+          // Proceed with analysis after timeout
         } else {
-          throw new Error('Failed to establish connection to the website (tried HTTP and HTTPS).');
+          throw new Error('Failed to establish connection to the website.');
+        }
+      }
+    } else {
+      // Try HTTP first
+      try {
+        mainResponse = await page.goto(httpUrl, {
+          waitUntil: 'load',
+          timeout: 30000
+        });
+        navigatedSuccessfully = true;
+      } catch (error) {
+        // HTTP failed, will fallback to HTTPS
+      }
+
+      httpFailed = !navigatedSuccessfully;
+
+      // If HTTP failed completely, fallback to direct HTTPS
+      if (!navigatedSuccessfully) {
+        try {
+          await page.close();
+          page = await context.newPage();
+          setupPageListeners(page);
+
+          mainResponse = await page.goto(httpsUrl, {
+            waitUntil: 'load',
+            timeout: 30000
+          });
+          navigatedSuccessfully = true;
+        } catch (error) {
+          const msg = error.message || '';
+          const name = error.name || '';
+          const isTimeout = name === 'TimeoutError' ||
+                            msg.includes('timeout') ||
+                            msg.includes('Timeout') ||
+                            msg.includes('TIMED_OUT') ||
+                            msg.includes('timed_out');
+          if (isTimeout) {
+            // Proceed with analysis after HTTPS timeout
+          } else {
+            throw new Error('Failed to establish connection to the website (tried HTTP and HTTPS).');
+          }
         }
       }
     }
@@ -650,7 +723,9 @@ export async function runAudit(targetUrl, options = {}) {
     } catch (secErr) {
       const reason = String(secErr.message || secErr);
       clearTimeout(scanTimeoutHandle);
-      await safeCloseBrowser(browser);
+      if (context) {
+      await context.close().catch(() => {});
+    }
       if (reason === 'redirect_limit') {
         return {
           success: false,
@@ -702,6 +777,49 @@ export async function runAudit(targetUrl, options = {}) {
 
     // Capture final screenshots (optional, but good for reporting)
     // const screenshot = await page.screenshot({ encoding: 'base64' });
+
+    
+    // Extract page links for crawl discovery
+    let discoveredLinks = [];
+    if (options.extractLinks && options.crawlScope) {
+      if (options.isRootPage) {
+        try {
+          const finalUrlParsed = new URL(finalUrl);
+          const finalHost = finalUrlParsed.hostname.toLowerCase();
+          options.crawlScope.domain = finalHost;
+          if (finalHost.startsWith('www.')) {
+            options.crawlScope.wwwEquivalent = finalHost.substring(4);
+          } else {
+            options.crawlScope.wwwEquivalent = 'www.' + finalHost;
+          }
+          
+          let newBasePath = '/';
+          const pathname = finalUrlParsed.pathname;
+          if (pathname.endsWith('/')) {
+            newBasePath = pathname;
+          } else {
+            const parts = pathname.split('/');
+            parts.pop();
+            newBasePath = parts.join('/');
+            if (!newBasePath.endsWith('/')) {
+              newBasePath += '/';
+            }
+          }
+          options.crawlScope.basePath = newBasePath;
+        } catch (e) {
+          // ignore parsing error
+        }
+      }
+
+      try {
+        const rawLinks = await page.evaluate(() => {
+          return Array.from(document.querySelectorAll('a[href]'))
+            .map(a => a.href)
+            .filter(href => href && href.startsWith('http'));
+        });
+        discoveredLinks = filterLinksToScope(rawLinks, options.crawlScope);
+      } catch (e) { /* ignore DOM errors */ }
+    }
 
     // Collect all cookies set in this context.
     // Some environments (e.g. read-only container filesystems) may prevent
@@ -943,7 +1061,9 @@ export async function runAudit(targetUrl, options = {}) {
     }
 
     clearTimeout(scanTimeoutHandle);
-    await safeCloseBrowser(browser);
+    if (context) {
+      await context.close().catch(() => {});
+    }
 
     // Compile GDPR compliance diagnostics
     const cookiesCount = analyzedCookies.length;
@@ -1148,7 +1268,7 @@ export async function runAudit(targetUrl, options = {}) {
 
     const redirected = getBaseDomain(targetHost) !== getBaseDomain(new URL(finalUrl).hostname);
 
-    return {
+    const scanResult = {
       success: true,
       url: finalUrl,
       originalUrl: targetUrl,
@@ -1185,9 +1305,17 @@ export async function runAudit(targetUrl, options = {}) {
       recommendations
     };
 
+    if (discoveredLinks && discoveredLinks.length > 0) {
+      scanResult.discoveredLinks = discoveredLinks;
+    }
+
+    return scanResult;
+
   } catch (error) {
     clearTimeout(scanTimeoutHandle);
-    await safeCloseBrowser(browser);
+    if (context) {
+      await context.close().catch(() => {});
+    }
     if (scanTimedOut) {
       return {
         success: false,
@@ -1202,5 +1330,25 @@ export async function runAudit(targetUrl, options = {}) {
       url: targetUrl,
       error: error.message || 'Failed to complete the audit scan.'
     };
+  }
+}
+
+export async function runAudit(targetUrl, options = {}) {
+  let browser;
+  try {
+    browser = await chromium.launch({
+      headless: true,
+      args: [
+        '--no-sandbox',
+        '--disable-setuid-sandbox',
+        '--disable-dev-shm-usage',
+        '--disable-web-security'
+      ]
+    });
+    return await runAuditWithBrowser(browser, targetUrl, options);
+  } finally {
+    if (browser) {
+      await safeCloseBrowser(browser);
+    }
   }
 }

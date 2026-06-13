@@ -91,9 +91,679 @@ document.addEventListener('DOMContentLoaded', () => {
   const connBadgeCount = document.getElementById('connBadgeCount');
   
   // Data state
+
   let currentScanData = null;
   let activeCookieFilter = 'all';
   let activeConnFilter = 'all';
+
+  // Crawl State variables
+  let scanMode = 'single'; // 'single' | 'crawl'
+  let crawlResults = null; // Full crawl result object
+  let crawlAbortController = null; // AbortController for cancelling
+  let activeCrawlFilter = 'all'; // 'all' | 'compliant' | 'non-compliant' | 'failed'
+  let activeViolationFilter = null; // type of violation currently filtered on, or null
+  let serverMaxCrawlPages = 50;
+  let serverHasApiKeysConfigured = false;
+
+  // Crawl DOM elements
+  const modeSingleBtn = document.getElementById('mode-single');
+  const modeCrawlBtn = document.getElementById('mode-crawl');
+  const crawlOptionsGroup = document.getElementById('crawlOptionsGroup');
+  const discoveryMethodSelect = document.getElementById('discoveryMethod');
+  const crawlDepthSelect = document.getElementById('crawlDepth');
+  const crawlDepthGroup = document.getElementById('crawlDepthGroup');
+  const maxPagesInput = document.getElementById('maxPages');
+  const respectRobotsTxtSelect = document.getElementById('respectRobotsTxt');
+  const respectRobotsTxtGroup = document.getElementById('respectRobotsTxtGroup');
+
+  const crawlProgressSection = document.getElementById('crawlProgressSection');
+  const discoveryStatusBadge = document.getElementById('discoveryStatusBadge');
+  const crawlProgressBar = document.getElementById('crawlProgressBar');
+  const crawlProgressText = document.getElementById('crawlProgressText');
+  const crawlRunningStats = document.getElementById('crawlRunningStats');
+  const livePagesList = document.getElementById('livePagesList');
+  const cancelCrawlBtn = document.getElementById('cancelCrawlBtn');
+
+  const crawlOverviewSection = document.getElementById('crawlOverviewSection');
+  const crawlOverviewRootUrl = document.getElementById('crawlOverviewRootUrl');
+  const newCrawlScanBtn = document.getElementById('newCrawlScanBtn');
+  const crawlMetaDiscovery = document.getElementById('crawlMetaDiscovery');
+  const crawlMetaScope = document.getElementById('crawlMetaScope');
+  const crawlMetaDuration = document.getElementById('crawlMetaDuration');
+  const crawlMetaTimestamp = document.getElementById('crawlMetaTimestamp');
+
+  const crawlStatPages = document.getElementById('crawlStatPages');
+  const crawlStatCompliant = document.getElementById('crawlStatCompliant');
+  const crawlStatIssues = document.getElementById('crawlStatIssues');
+  const crawlStatPagesDesc = document.getElementById('crawlStatPagesDesc');
+  const crawlStatCompliantDesc = document.getElementById('crawlStatCompliantDesc');
+  const crawlStatIssuesDesc = document.getElementById('crawlStatIssuesDesc');
+
+  const topIssuesList = document.getElementById('topIssuesList');
+  const tableFilters = document.getElementById('tableFilters');
+  const pagesTableBody = document.getElementById('pagesTableBody');
+
+  const crawlBreadcrumb = document.getElementById('crawl-breadcrumb');
+  const backToOverviewBtn = document.getElementById('back-to-overview');
+  const breadcrumbPageUrl = document.getElementById('breadcrumb-page-url');
+
+  // --- CRAWL UX EVENT BINDINGS & LOGIC ---
+
+  function setScanMode(mode) {
+    scanMode = mode;
+    if (mode === 'crawl') {
+      modeSingleBtn.classList.add('active');
+      modeCrawlBtn.classList.add('active'); // active pill styling
+      // Actually toggle correct states
+      modeSingleBtn.classList.remove('active');
+      crawlOptionsGroup.classList.remove('hidden');
+      scanBtn.querySelector('span').textContent = 'Site Audit';
+    } else {
+      modeCrawlBtn.classList.remove('active');
+      modeSingleBtn.classList.add('active');
+      crawlOptionsGroup.classList.add('hidden');
+      scanBtn.querySelector('span').textContent = 'Scan Page';
+    }
+  }
+
+  modeSingleBtn.addEventListener('click', () => setScanMode('single'));
+  modeCrawlBtn.addEventListener('click', () => {
+    if (modeCrawlBtn.classList.contains('disabled')) {
+      return;
+    }
+    setScanMode('crawl');
+  });
+
+  discoveryMethodSelect.addEventListener('change', () => {
+    if (discoveryMethodSelect.value === 'sitemap') {
+      crawlDepthGroup.classList.add('dimmed');
+    } else {
+      crawlDepthGroup.classList.remove('dimmed');
+    }
+  });
+
+  async function runCrawlScan(url) {
+    targetUrlInput.value = url;
+    const authUsername = authUsernameInput.value.trim();
+    const authPassword = authPasswordInput.value.trim();
+    const customHeaderName = customHeaderNameInput.value.trim();
+    const customHeaderValue = customHeaderValueInput.value.trim();
+    const apiKey = apiKeyInput.value.trim();
+
+    const discoveryMethod = discoveryMethodSelect.value;
+    const maxDepth = parseInt(crawlDepthSelect.value, 10);
+    const maxPages = parseInt(maxPagesInput.value, 10);
+    const respectRobotsTxt = respectRobotsTxtSelect ? (respectRobotsTxtSelect.value === 'true') : false;
+
+    // Update URL query parameters
+    const searchParams = new URLSearchParams(window.location.search);
+    searchParams.set('url', url);
+    searchParams.set('mode', 'crawl');
+    if (customHeaderName) searchParams.set('hdr_name', customHeaderName);
+    else searchParams.delete('hdr_name');
+    if (customHeaderValue) searchParams.set('hdr_val', customHeaderValue);
+    else searchParams.delete('hdr_val');
+
+    const newRelativePathQuery = window.location.pathname + '?' + searchParams.toString();
+    window.history.pushState(null, '', newRelativePathQuery);
+
+    // Show progress UI, hide others
+    document.querySelector('.hero-section').style.display = 'none';
+    errorSection.classList.add('hidden');
+    dashboardSection.classList.add('hidden');
+    crawlOverviewSection.classList.add('hidden');
+    crawlProgressSection.classList.remove('hidden');
+
+    discoveryStatusBadge.textContent = 'Initializing...';
+    discoveryStatusBadge.className = 'status-badge badge-info';
+    crawlProgressBar.style.width = '0%';
+    crawlProgressText.textContent = '0 / 0 Pages scanned';
+    crawlRunningStats.innerHTML = `<strong class="text-success">0</strong> compliant // <strong class="text-danger">0</strong> issues`;
+    livePagesList.innerHTML = '';
+
+    crawlAbortController = new AbortController();
+
+    try {
+      const response = await fetch('/api/crawl', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(apiKey ? { 'x-api-key': apiKey } : {})
+        },
+        body: JSON.stringify({
+          url,
+          authUsername,
+          authPassword,
+          customHeaderName,
+          customHeaderValue,
+          discoveryMethod,
+          maxDepth,
+          maxPages,
+          respectRobotsTxt
+        }),
+        signal: crawlAbortController.signal
+      });
+
+      if (!response.ok) {
+        let errorMsg = 'The site crawl failed. Please check that the website is online and reachable.';
+        let errorCategory = null;
+        try {
+          const errData = await response.json();
+          errorMsg = errData.error || errorMsg;
+          errorCategory = errData.category || null;
+        } catch (e) {
+          if (response.status === 429) {
+            errorMsg = 'Too many crawls have been requested from your IP address. Please wait a few minutes.';
+            errorCategory = 'rate_limit';
+          } else if (response.status === 503) {
+            errorMsg = 'The server is busy. Please try again in a few seconds.';
+            errorCategory = 'busy';
+          }
+        }
+        throw { category: errorCategory, message: errorMsg };
+      }
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder('utf-8');
+      let buffer = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop();
+
+        for (const line of lines) {
+          if (line.trim()) {
+            try {
+              const event = JSON.parse(line);
+              handleCrawlEvent(event);
+            } catch (e) {
+              console.error('Error parsing NDJSON event:', e);
+            }
+          }
+        }
+      }
+    } catch (err) {
+      if (err.name === 'AbortError') {
+        cancelCrawl();
+        return;
+      }
+      crawlProgressSection.classList.add('hidden');
+      document.querySelector('.hero-section').style.display = 'block';
+      if (err.category) {
+        showCategorizedError(err.category, err.message);
+      } else {
+        showError(err.message || 'Could not communicate with the crawl server.');
+      }
+    }
+  }
+
+  let crawlResolvedBaseUrl = '';
+
+  function getDisplayPath(urlStr) {
+    try {
+      const u = new URL(urlStr);
+      return u.pathname + u.search;
+    } catch (e) {
+      return urlStr;
+    }
+  }
+
+  let discoveredUrlsCount = 0;
+  let scannedPagesCount = 0;
+  let compliantPagesCount = 0;
+  let issuesCount = 0;
+
+  function handleCrawlEvent(event) {
+    const { event: eventName, data } = event;
+
+    switch (eventName) {
+      case 'crawl_started':
+        discoveredUrlsCount = 0;
+        scannedPagesCount = 0;
+        compliantPagesCount = 0;
+        issuesCount = 0;
+        crawlResolvedBaseUrl = data.rootUrl;
+        const crawlProgressBaseUrl = document.getElementById('crawlProgressBaseUrl');
+        if (crawlProgressBaseUrl) {
+          crawlProgressBaseUrl.textContent = data.rootUrl;
+        }
+        break;
+
+      case 'discovery_method':
+        if (data.method === 'sitemap') {
+          discoveryStatusBadge.textContent = `Sitemap Detected (${data.totalFound} URLs)`;
+          discoveryStatusBadge.className = 'status-badge badge-success';
+        } else {
+          discoveryStatusBadge.textContent = 'Following Links';
+          discoveryStatusBadge.className = 'status-badge badge-info';
+        }
+        break;
+
+      case 'page_discovered':
+        discoveredUrlsCount++;
+        crawlProgressText.textContent = `${scannedPagesCount} / ${discoveredUrlsCount} Pages scanned`;
+        break;
+
+      case 'page_scan_started':
+        const logId = 'log-' + data.url.replace(/[^a-zA-Z0-9]/g, '-');
+        let item = document.getElementById(logId);
+        if (!item) {
+          item = document.createElement('div');
+          item.id = logId;
+          item.className = 'live-page-item';
+          livePagesList.appendChild(item);
+        }
+        let displayPath = getDisplayPath(data.url);
+        item.innerHTML = `
+          <span class="live-page-url" title="${escapeHtml(data.url)}">${escapeHtml(displayPath)}</span>
+          <span class="live-page-status"><i class="fa-solid fa-spinner fa-spin text-muted"></i> Scanning...</span>
+        `;
+        livePagesList.scrollTop = livePagesList.scrollHeight;
+        break;
+
+      case 'page_scan_completed':
+        scannedPagesCount++;
+        if (!data.result.duplicate && !data.result.externalRedirect) {
+          if (data.result.compliant) {
+            compliantPagesCount++;
+          }
+          issuesCount += data.result.violations ? data.result.violations.length : 0;
+        }
+        
+        crawlProgressText.textContent = `${scannedPagesCount} / ${discoveredUrlsCount} Pages scanned`;
+        crawlProgressBar.style.width = `${(scannedPagesCount / discoveredUrlsCount) * 100}%`;
+        crawlRunningStats.innerHTML = `<span class="text-success"><strong class="font-bold">${compliantPagesCount}</strong> compliant</span> // <span class="text-danger"><strong class="font-bold">${issuesCount}</strong> issues</span>`;
+
+        if (data.depth === 0 && data.resolvedUrl) {
+          crawlResolvedBaseUrl = data.resolvedUrl;
+          const progressBaseUrlEl = document.getElementById('crawlProgressBaseUrl');
+          if (progressBaseUrlEl) {
+            const cleanUrl = data.url.replace(/\/$/, '');
+            const cleanResolved = data.resolvedUrl.replace(/\/$/, '');
+            if (cleanUrl !== cleanResolved) {
+              progressBaseUrlEl.innerHTML = `${escapeHtml(data.url)} <i class="fa-solid fa-arrow-right" style="font-size: 0.75rem; margin: 0 4px; color: var(--text-muted);"></i> ${escapeHtml(data.resolvedUrl)}`;
+            } else {
+              progressBaseUrlEl.textContent = data.resolvedUrl;
+            }
+          }
+        }
+
+        const logIdComp = 'log-' + data.url.replace(/[^a-zA-Z0-9]/g, '-');
+        const itemComp = document.getElementById(logIdComp);
+        if (itemComp) {
+          let statusIcon, statusText;
+          if (data.result.duplicate) {
+            statusIcon = '<i class="fa-solid fa-copy text-muted"></i>';
+            statusText = `<span class="text-muted">Skipped (Duplicate)</span>`;
+          } else if (data.result.externalRedirect) {
+            statusIcon = '<i class="fa-solid fa-arrow-up-right-from-square text-muted"></i>';
+            statusText = `<span class="text-muted">Skipped (External)</span>`;
+          } else if (data.result.violations && data.result.violations.length > 0) {
+            statusIcon = '<i class="fa-solid fa-circle-xmark text-danger"></i>';
+            statusText = `<span class="text-danger">Non-compliant</span>`;
+          } else if (data.result.warnings && data.result.warnings.length > 0) {
+            statusIcon = '<i class="fa-solid fa-circle-exclamation text-warning"></i>';
+            statusText = `<span class="text-warning">Warnings</span>`;
+          } else {
+            statusIcon = '<i class="fa-solid fa-circle-check text-success"></i>';
+            statusText = `<span class="text-success">Compliant</span>`;
+          }
+          itemComp.querySelector('.live-page-status').innerHTML = `${statusIcon} ${statusText}`;
+
+          if (data.resolvedUrl) {
+            let displayPathOrig = getDisplayPath(data.url);
+            let displayPathFinal = getDisplayPath(data.resolvedUrl);
+            if (displayPathOrig !== displayPathFinal) {
+              itemComp.querySelector('.live-page-url').innerHTML = `
+                <span class="text-muted" title="${escapeHtml(data.url)}">${escapeHtml(displayPathOrig)}</span>
+                <i class="fa-solid fa-arrow-right text-muted" style="margin: 0 4px; font-size: 0.8rem;"></i>
+                <span title="${escapeHtml(data.resolvedUrl)}">${escapeHtml(displayPathFinal)}</span>
+              `;
+            } else {
+              itemComp.querySelector('.live-page-url').innerHTML = `
+                <span title="${escapeHtml(data.resolvedUrl)}">${escapeHtml(displayPathFinal)}</span>
+              `;
+            }
+          }
+        }
+        break;
+
+      case 'page_scan_failed':
+        scannedPagesCount++;
+        
+        crawlProgressText.textContent = `${scannedPagesCount} / ${discoveredUrlsCount} Pages scanned`;
+        crawlProgressBar.style.width = `${(scannedPagesCount / discoveredUrlsCount) * 100}%`;
+
+        const logIdFail = 'log-' + data.url.replace(/[^a-zA-Z0-9]/g, '-');
+        const itemFail = document.getElementById(logIdFail);
+        if (itemFail) {
+          itemFail.querySelector('.live-page-status').innerHTML = `<i class="fa-solid fa-triangle-exclamation text-danger"></i> <span class="text-danger">Failed</span>`;
+        }
+        break;
+
+      case 'crawl_completed':
+        renderCrawlOverview(data);
+        break;
+    }
+  }
+
+  function renderCrawlOverview(data) {
+    crawlResults = data;
+    
+    const rootPage = data.pages.find(p => p.depth === 0 && p.status === 'completed');
+    if (rootPage && rootPage.resolvedUrl) {
+      crawlResolvedBaseUrl = rootPage.resolvedUrl;
+    } else {
+      crawlResolvedBaseUrl = data.rootUrl;
+    }
+    
+    crawlProgressSection.classList.add('hidden');
+    crawlOverviewSection.classList.remove('hidden');
+
+    if (crawlOverviewRootUrl) {
+      if (rootPage && rootPage.resolvedUrl) {
+        const cleanUrl = data.rootUrl.replace(/\/$/, '');
+        const cleanResolved = rootPage.resolvedUrl.replace(/\/$/, '');
+        if (cleanUrl !== cleanResolved) {
+          crawlOverviewRootUrl.innerHTML = `${escapeHtml(data.rootUrl)} <i class="fa-solid fa-arrow-right" style="font-size: 0.8rem; margin: 0 4px; color: var(--text-muted);"></i> ${escapeHtml(rootPage.resolvedUrl)}`;
+        } else {
+          crawlOverviewRootUrl.textContent = data.rootUrl;
+        }
+      } else {
+        crawlOverviewRootUrl.textContent = data.rootUrl;
+      }
+    }
+    crawlMetaDiscovery.textContent = data.discovery.method === 'sitemap' ? 'Sitemap.xml' : 'Follow Links';
+    crawlMetaScope.textContent = `Path prefix: ${data.scope.basePath}`;
+    crawlMetaDuration.textContent = `${(data.durationMs / 1000).toFixed(1)}s`;
+    crawlMetaTimestamp.textContent = new Date(data.timestamp).toLocaleString();
+
+    const detected = data.aggregate.detectedPages || data.aggregate.totalPages;
+    crawlStatPages.textContent = `${data.aggregate.totalPages} / ${detected}`;
+    
+    let desc = `${data.aggregate.completedPages} completed / ${data.aggregate.failedPages} failed`;
+    crawlStatPagesDesc.textContent = desc;
+
+    const skipsContainer = document.getElementById('crawlStatPagesSkips');
+    if (skipsContainer) {
+      skipsContainer.innerHTML = '';
+      const skips = [];
+      if (data.aggregate.duplicateCount > 0) {
+        skips.push(`<span class="skip-badge" title="These pages redirect to URLs that were already audited during this scan. They were skipped to prevent duplicate records."><i class="fa-solid fa-copy"></i> ${data.aggregate.duplicateCount} duplicate${data.aggregate.duplicateCount > 1 ? 's' : ''}</span>`);
+      }
+      if (data.aggregate.externalRedirectCount > 0) {
+        skips.push(`<span class="skip-badge" title="These pages redirect to external domains and subdomains. They were skipped for security and compliance accuracy."><i class="fa-solid fa-arrow-up-right-from-square"></i> ${data.aggregate.externalRedirectCount} external${data.aggregate.externalRedirectCount > 1 ? 's' : ''}</span>`);
+      }
+      if (data.aggregate.unprocessedCount > 0) {
+        skips.push(`<span class="skip-badge" title="These pages were discovered but not scanned because the crawl was stopped, reached the page limit, or timed out."><i class="fa-solid fa-clock"></i> ${data.aggregate.unprocessedCount} unprocessed</span>`);
+      }
+      if (skips.length > 0) {
+        skipsContainer.innerHTML = skips.join('');
+        skipsContainer.classList.remove('hidden');
+      } else {
+        skipsContainer.classList.add('hidden');
+      }
+    }
+    
+    crawlStatCompliant.textContent = data.aggregate.compliantPages;
+    crawlStatCompliantDesc.textContent = `out of ${data.aggregate.completedPages} pages`;
+
+    const uniqueViolations = data.aggregate.topViolations ? data.aggregate.topViolations.length : 0;
+    let totalViolations = 0;
+    if (data.aggregate.topViolations) {
+      totalViolations = data.aggregate.topViolations.reduce((sum, v) => sum + v.pageCount, 0);
+    }
+    crawlStatIssues.innerHTML = `${uniqueViolations} <span style="font-size: 1.3rem; color: var(--text-muted); font-weight: 400; margin: 0 4px;">/</span> ${totalViolations}`;
+    crawlStatIssuesDesc.textContent = 'Unique issues / Total instances';
+
+    topIssuesList.innerHTML = '';
+    if (data.aggregate.topViolations && data.aggregate.topViolations.length > 0) {
+      data.aggregate.topViolations.forEach(v => {
+        const item = document.createElement('div');
+        item.className = 'top-issue-item clickable-issue';
+        item.setAttribute('data-type', v.type);
+        item.innerHTML = `
+          <div class="top-issue-info">
+            <span class="top-issue-title">${escapeHtml(v.type)}</span>
+            <span class="top-issue-desc">${escapeHtml(v.message)}</span>
+          </div>
+          <span class="top-issue-badge">${v.pageCount} page${v.pageCount > 1 ? 's' : ''}</span>
+        `;
+        item.addEventListener('click', () => {
+          if (activeViolationFilter === v.type) {
+            activeViolationFilter = null;
+          } else {
+            activeViolationFilter = v.type;
+          }
+          renderPagesTable(activeCrawlFilter);
+        });
+        topIssuesList.appendChild(item);
+      });
+    } else {
+      topIssuesList.innerHTML = '<div class="center text-muted" style="padding: 2rem;">No GDPR violations detected on this site.</div>';
+    }
+
+    activeCrawlFilter = 'all';
+    activeViolationFilter = null;
+
+    const hasWarnings = data.pages.some(p => p.status === 'completed' && p.result?.compliant && p.result.warnings && p.result.warnings.length > 0);
+    const filterBtnWarning = document.getElementById('filterBtnWarning');
+    if (filterBtnWarning) {
+      if (hasWarnings) {
+        filterBtnWarning.classList.remove('hidden');
+      } else {
+        filterBtnWarning.classList.add('hidden');
+      }
+    }
+
+    document.querySelectorAll('#tableFilters .filter-btn').forEach(btn => {
+      if (btn.getAttribute('data-filter') === 'all') btn.classList.add('active');
+      else btn.classList.remove('active');
+    });
+    renderPagesTable('all');
+  }
+
+  function renderPagesTable(filter) {
+    if (!crawlResults) return;
+    pagesTableBody.innerHTML = '';
+
+    // Update active class on top-issue-items
+    document.querySelectorAll('#topIssuesList .top-issue-item').forEach(el => {
+      if (activeViolationFilter && el.getAttribute('data-type') === activeViolationFilter) {
+        el.classList.add('active');
+      } else {
+        el.classList.remove('active');
+      }
+    });
+
+    // Update filter badge
+    const badge = document.getElementById('violationFilterBadge');
+    const nameEl = document.getElementById('violationFilterName');
+    if (badge && nameEl) {
+      if (activeViolationFilter) {
+        nameEl.textContent = activeViolationFilter;
+        badge.classList.remove('hidden');
+      } else {
+        badge.classList.add('hidden');
+      }
+    }
+
+    let pages = crawlResults.pages;
+    if (filter === 'compliant') {
+      pages = pages.filter(p => p.status === 'completed' && p.result?.compliant && (!p.result.warnings || p.result.warnings.length === 0));
+    } else if (filter === 'warning') {
+      pages = pages.filter(p => p.status === 'completed' && p.result?.compliant && p.result.warnings && p.result.warnings.length > 0);
+    } else if (filter === 'non-compliant') {
+      pages = pages.filter(p => p.status === 'completed' && !p.result?.compliant);
+    } else if (filter === 'failed') {
+      pages = pages.filter(p => p.status === 'failed');
+    }
+
+    if (activeViolationFilter) {
+      pages = pages.filter(p => p.status === 'completed' && p.result?.violations && p.result.violations.some(v => v.type === activeViolationFilter));
+    }
+
+    if (pages.length === 0) {
+      pagesTableBody.innerHTML = `<tr><td colspan="6" class="center text-muted" style="padding: 2rem;">No pages match the selected filter.</td></tr>`;
+      return;
+    }
+
+    pages.forEach((p) => {
+      const tr = document.createElement('tr');
+
+      let statusIcon = '';
+      if (p.status === 'failed') {
+        statusIcon = '<span class="text-danger" style="display:inline-flex; align-items:center; gap:6px; font-size:0.85rem;"><i class="fa-solid fa-triangle-exclamation"></i> Failed</span>';
+      } else {
+        if (p.result.violations && p.result.violations.length > 0) {
+          statusIcon = '<span class="text-danger" style="display:inline-flex; align-items:center; gap:6px; font-size:0.85rem;"><i class="fa-solid fa-circle-xmark"></i> Non-compliant</span>';
+        } else if (p.result.warnings && p.result.warnings.length > 0) {
+          statusIcon = '<span class="text-warning" style="display:inline-flex; align-items:center; gap:6px; font-size:0.85rem;"><i class="fa-solid fa-circle-exclamation"></i> Warnings</span>';
+        } else {
+          statusIcon = '<span class="text-success" style="display:inline-flex; align-items:center; gap:6px; font-size:0.85rem;"><i class="fa-solid fa-circle-check"></i> Compliant</span>';
+        }
+      }
+
+      let displayPathOrig = getDisplayPath(p.url);
+      let displayPathFinal = getDisplayPath(p.resolvedUrl || p.url);
+      let displayPath = '';
+
+      if (p.redirected && p.resolvedUrl && displayPathOrig !== displayPathFinal) {
+        displayPath = `<span class="text-muted" title="${escapeHtml(p.url)}">${escapeHtml(displayPathOrig)}</span> <i class="fa-solid fa-arrow-right text-muted" style="margin: 0 4px; font-size: 0.75rem;"></i> <span title="${escapeHtml(p.resolvedUrl)}">${escapeHtml(displayPathFinal)}</span>`;
+      } else {
+        displayPath = `<span title="${escapeHtml(p.resolvedUrl || p.url)}">${escapeHtml(displayPathFinal)}</span>`;
+      }
+
+      const violationsCount = p.status === 'completed' ? (p.result.violations ? p.result.violations.length : 0) : '—';
+      const cookiesCount = p.status === 'completed' ? (
+        p.result.cookies
+          ? p.result.cookies.filter(c => 
+              c.category === 'Marketing/Advertising' || 
+              c.category === 'Analytics' || 
+              c.category === 'Unknown' || 
+              (c.securityIssues && c.securityIssues.length > 0)
+            ).length
+          : 0
+      ) : '—';
+      const requestsCount = p.status === 'completed' ? (p.result.summary ? p.result.summary.thirdPartyRequests : 0) : '—';
+
+      const trIndex = crawlResults.pages.indexOf(p);
+      const actionButton = p.status === 'completed'
+        ? `<button class="view-btn" data-index="${trIndex}"><i class="fa-solid fa-eye"></i> View</button>`
+        : `<span class="text-muted" style="font-size: 0.8rem;">—</span>`;
+
+      tr.innerHTML = `
+        <td class="td-status" style="text-align: left; padding-left: 1.5rem;">${statusIcon}</td>
+        <td class="td-url">${displayPath}</td>
+        <td>${violationsCount}</td>
+        <td>${cookiesCount}</td>
+        <td>${requestsCount}</td>
+        <td>${actionButton}</td>
+      `;
+      pagesTableBody.appendChild(tr);
+    });
+  }
+
+  window.drillIntoPage = function(pageIndex) {
+    try {
+      if (!crawlResults || !crawlResults.pages) {
+        console.error('drillIntoPage error: crawlResults or crawlResults.pages is missing');
+        return;
+      }
+      const pageData = crawlResults.pages[pageIndex];
+      if (!pageData) {
+        console.error('drillIntoPage error: no page data found for index', pageIndex);
+        return;
+      }
+      if (pageData.status !== 'completed') {
+        console.warn('drillIntoPage warning: page scan status is not completed:', pageData.status);
+        return;
+      }
+
+      // Hide crawl overview
+      crawlOverviewSection.classList.add('hidden');
+
+      // Show dashboard
+      dashboardSection.classList.remove('hidden');
+
+      // Show breadcrumb
+      crawlBreadcrumb.style.display = 'flex';
+      breadcrumbPageUrl.textContent = pageData.url;
+
+      // Render detail dashboard
+      renderDashboard(pageData.result);
+      dashboardSection.scrollIntoView({ behavior: 'smooth' });
+    } catch (err) {
+      console.error('Error in drillIntoPage:', err);
+    }
+  };
+
+  function backToOverview() {
+    dashboardSection.classList.add('hidden');
+    crawlBreadcrumb.style.display = 'none';
+    crawlOverviewSection.classList.remove('hidden');
+    crawlOverviewSection.scrollIntoView({ behavior: 'smooth' });
+  }
+
+  backToOverviewBtn.addEventListener('click', backToOverview);
+
+  function cancelCrawl() {
+    if (crawlAbortController) {
+      crawlAbortController.abort();
+    }
+    crawlProgressSection.classList.add('hidden');
+    document.querySelector('.hero-section').style.display = 'block';
+  }
+
+  cancelCrawlBtn.addEventListener('click', cancelCrawl);
+
+  newCrawlScanBtn.addEventListener('click', () => {
+    crawlOverviewSection.classList.add('hidden');
+    document.querySelector('.hero-section').style.display = 'block';
+    
+    const newRelativePathQuery = window.location.pathname;
+    window.history.pushState(null, '', newRelativePathQuery);
+    
+    targetUrlInput.value = '';
+    targetUrlInput.focus();
+  });
+
+  tableFilters.addEventListener('click', (e) => {
+    if (!e.target.classList.contains('filter-btn')) return;
+    
+    document.querySelectorAll('#tableFilters .filter-btn').forEach(btn => btn.classList.remove('active'));
+    e.target.classList.add('active');
+    
+    activeCrawlFilter = e.target.getAttribute('data-filter');
+    renderPagesTable(activeCrawlFilter);
+  });
+
+  const clearViolationFilterBtn = document.getElementById('clearViolationFilterBtn');
+  if (clearViolationFilterBtn) {
+    clearViolationFilterBtn.addEventListener('click', () => {
+      activeViolationFilter = null;
+      renderPagesTable(activeCrawlFilter);
+    });
+  }
+
+  pagesTableBody.addEventListener('click', (e) => {
+    try {
+      const viewBtn = e.target.closest('.view-btn');
+      if (viewBtn) {
+        const pageIndex = parseInt(viewBtn.getAttribute('data-index'), 10);
+        if (!isNaN(pageIndex)) {
+          window.drillIntoPage(pageIndex);
+        }
+      }
+    } catch (err) {
+      console.error('Error in pagesTableBody click handler:', err);
+    }
+  });
+
   
   // Tab Switching
   tabButtons.forEach(btn => {
@@ -264,7 +934,11 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     targetUrlInput.value = result.url;
-    runAuditScan(result.url);
+    if (scanMode === 'crawl') {
+      runCrawlScan(result.url);
+    } else {
+      runAuditScan(result.url);
+    }
   });
 
   retryBtn.addEventListener('click', () => {
@@ -495,6 +1169,14 @@ document.addEventListener('DOMContentLoaded', () => {
       errorCard.dataset.category = category;
     }
     errorMessage.innerText = msg;
+
+    if (retryBtn) {
+      if (category === 'rate_limit' || category === 'busy' || category === 'access_denied' || category === 'connection' || !category) {
+        retryBtn.textContent = 'Try Again';
+      } else {
+        retryBtn.textContent = 'Try Another URL';
+      }
+    }
 
     targetUrlInput.disabled = false;
     scanBtn.disabled = false;
@@ -1559,17 +2241,28 @@ document.addEventListener('DOMContentLoaded', () => {
   // Save API Key to sessionStorage on change
   apiKeyInput.addEventListener('input', () => {
     sessionStorage.setItem('clearload_api_key', apiKeyInput.value.trim());
+    updateMaxPagesLimitText();
+    updateCrawlModeVisibility();
   });
 
   if (showAdvanced) {
     advancedOptionsPanel.classList.remove('hidden');
   }
 
+  const queryMode = urlParams.get('mode') || 'single';
+  if (queryMode === 'crawl') {
+    setScanMode('crawl');
+  }
+
   if (queryUrl) {
     const queryResult = cleanAndValidateUrl(queryUrl);
     if (queryResult.ok) {
       targetUrlInput.value = queryResult.url;
-      runAuditScan(queryResult.url);
+      if (queryMode === 'crawl') {
+        runCrawlScan(queryResult.url);
+      } else {
+        runAuditScan(queryResult.url);
+      }
     } else {
       showCategorizedError(queryResult.category, queryResult.error);
     }
@@ -1625,6 +2318,53 @@ document.addEventListener('DOMContentLoaded', () => {
     return html;
   }
 
+  function updateMaxPagesLimitText() {
+    const maxPagesLimitText = document.getElementById('maxPagesLimitText');
+    const maxPagesInput = document.getElementById('maxPages');
+    if (!maxPagesLimitText || !maxPagesInput) return;
+
+    const isLocalhost = window.location.hostname === 'localhost' || 
+                        window.location.hostname === '127.0.0.1' || 
+                        window.location.hostname === '[::1]';
+    const hasApiKey = apiKeyInput && apiKeyInput.value.trim() !== '';
+
+    if (isLocalhost || hasApiKey || serverMaxCrawlPages === -1) {
+      maxPagesLimitText.textContent = '(unrestricted)';
+      maxPagesInput.removeAttribute('max');
+    } else if (serverMaxCrawlPages === 0) {
+      maxPagesLimitText.textContent = '(disabled for non-admins)';
+      maxPagesInput.setAttribute('max', '25');
+    } else {
+      maxPagesLimitText.textContent = `(up to ${serverMaxCrawlPages} allowed)`;
+      maxPagesInput.setAttribute('max', serverMaxCrawlPages);
+    }
+  }
+
+  function updateCrawlModeVisibility() {
+    const modeCrawlBtn = document.getElementById('mode-crawl');
+    if (!modeCrawlBtn) return;
+
+    const isLocalhost = window.location.hostname === 'localhost' || 
+                        window.location.hostname === '127.0.0.1' || 
+                        window.location.hostname === '[::1]';
+    const hasApiKey = apiKeyInput && apiKeyInput.value.trim() !== '';
+
+    if (serverMaxCrawlPages === 0 && !isLocalhost && !hasApiKey) {
+      if (!serverHasApiKeysConfigured) {
+        modeCrawlBtn.style.display = 'none';
+      } else {
+        modeCrawlBtn.style.display = '';
+        modeCrawlBtn.classList.add('disabled');
+        modeCrawlBtn.setAttribute('title', 'Site auditing is disabled on this server unless an administrator API Key is provided.');
+      }
+      setScanMode('single');
+    } else {
+      modeCrawlBtn.style.display = '';
+      modeCrawlBtn.classList.remove('disabled');
+      modeCrawlBtn.setAttribute('title', 'Site Audit');
+    }
+  }
+
   // Load and display version from the backend status endpoint
   async function loadAppVersion() {
     try {
@@ -1654,6 +2394,26 @@ document.addEventListener('DOMContentLoaded', () => {
           wrapper.style.display = '';
         }
       }
+      if (data && respectRobotsTxtGroup && respectRobotsTxtSelect) {
+        if (data.forceRespectRobotsTxt) {
+          respectRobotsTxtSelect.value = 'true';
+          respectRobotsTxtSelect.disabled = true;
+          const opt = respectRobotsTxtSelect.querySelector('option[value="true"]');
+          if (opt) {
+            opt.innerText = 'Yes (Enforced by server)';
+          }
+        } else {
+          respectRobotsTxtGroup.classList.remove('hidden');
+        }
+      }
+      if (data && data.maxCrawlPages !== undefined) {
+        serverMaxCrawlPages = data.maxCrawlPages;
+      }
+      if (data && data.hasApiKeysConfigured !== undefined) {
+        serverHasApiKeysConfigured = data.hasApiKeysConfigured;
+      }
+      updateMaxPagesLimitText();
+      updateCrawlModeVisibility();
     } catch (e) {
       console.warn('Failed to load application version from backend status endpoint.');
     }
