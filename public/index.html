@@ -328,9 +328,31 @@
                                 <h2>Site Audit Results</h2>
                                 <p id="crawlOverviewRootUrl" class="crawl-url-subtitle"></p>
                             </div>
-                            <button id="newCrawlScanBtn" class="primary-btn" type="button">
-                                <i class="fa-solid fa-rotate-left"></i> <span>New Scan</span>
-                            </button>
+                            <div class="compliance-actions-row">
+                                <button id="newCrawlScanBtn" class="primary-btn" type="button">
+                                    <i class="fa-solid fa-rotate-left"></i> <span>New Scan</span>
+                                </button>
+                                <div class="export-dropdown-container">
+                                    <button
+                                        id="crawlExportBtn"
+                                        class="export-badge-btn"
+                                        title="Export crawl audit report or pages list"
+                                        type="button"
+                                    >
+                                        <i class="fa-solid fa-download"></i>
+                                        <span>Export Report</span>
+                                        <i class="fa-solid fa-chevron-down dropdown-arrow"></i>
+                                    </button>
+                                    <div class="export-dropdown-menu hidden" id="crawlExportDropdown">
+                                        <button id="crawlExportPdfBtn" type="button">
+                                            <i class="fa-solid fa-file-pdf"></i> Export PDF Report
+                                        </button>
+                                        <button id="crawlExportPagesCsvBtn" type="button">
+                                            <i class="fa-solid fa-file-csv"></i> Export Pages List (CSV)
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                         <div class="crawl-meta-grid">
                             <div class="meta-item">
@@ -503,14 +525,43 @@
                                         >Scanned just now</span
                                     >
                                 </div>
-                                <button
-                                    id="shareBtn"
-                                    class="share-badge-btn"
-                                    title="Copy shareable audit link to clipboard"
-                                >
-                                    <i class="fa-solid fa-share-nodes"></i>
-                                    <span>Share Audit Link</span>
-                                </button>
+                                <div class="compliance-actions-row">
+                                    <button
+                                        id="shareBtn"
+                                        class="share-badge-btn"
+                                        title="Copy shareable audit link to clipboard"
+                                        type="button"
+                                    >
+                                        <i class="fa-solid fa-share-nodes"></i>
+                                        <span>Share Audit Link</span>
+                                    </button>
+                                    <div class="export-dropdown-container">
+                                        <button
+                                            id="exportBtn"
+                                            class="export-badge-btn"
+                                            title="Export audit report or data tables"
+                                            type="button"
+                                        >
+                                            <i class="fa-solid fa-download"></i>
+                                            <span>Export Report</span>
+                                            <i class="fa-solid fa-chevron-down dropdown-arrow"></i>
+                                        </button>
+                                        <div class="export-dropdown-menu hidden" id="exportDropdown">
+                                            <button id="exportPdfBtn" type="button">
+                                                <i class="fa-solid fa-file-pdf"></i> Export PDF Report
+                                            </button>
+                                            <button id="exportCookiesCsvBtn" type="button">
+                                                <i class="fa-solid fa-file-csv"></i> Export Cookies (CSV)
+                                            </button>
+                                            <button id="exportConnectionsCsvBtn" type="button">
+                                                <i class="fa-solid fa-file-csv"></i> Export Connections (CSV)
+                                            </button>
+                                            <button id="exportDiagnosticsCsvBtn" type="button">
+                                                <i class="fa-solid fa-file-csv"></i> Export Compliance Action Items (CSV)
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -2281,6 +2332,7 @@
                 </div>
             </div>
         </div>
+        <div id="printReport" class="print-only"></div>
         <script src="app.js"></script>
     </body>
 </html>

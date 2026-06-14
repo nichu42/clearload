@@ -147,6 +147,8 @@ document.addEventListener('DOMContentLoaded', () => {
   const backToOverviewBtn = document.getElementById('back-to-overview');
   const breadcrumbPageUrl = document.getElementById('breadcrumb-page-url');
 
+
+
   // --- CRAWL UX EVENT BINDINGS & LOGIC ---
 
   function setScanMode(mode) {
@@ -954,6 +956,789 @@ document.addEventListener('DOMContentLoaded', () => {
     targetUrlInput.focus();
   });
 
+  // --- EXPORT & REPORTING FEATURES ---
+  const exportBtn = document.getElementById('exportBtn');
+  const exportDropdown = document.getElementById('exportDropdown');
+  const exportPdfBtn = document.getElementById('exportPdfBtn');
+  const exportCookiesCsvBtn = document.getElementById('exportCookiesCsvBtn');
+  const exportConnectionsCsvBtn = document.getElementById('exportConnectionsCsvBtn');
+  const exportDiagnosticsCsvBtn = document.getElementById('exportDiagnosticsCsvBtn');
+
+  const crawlExportBtn = document.getElementById('crawlExportBtn');
+  const crawlExportDropdown = document.getElementById('crawlExportDropdown');
+  const crawlExportPdfBtn = document.getElementById('crawlExportPdfBtn');
+  const crawlExportPagesCsvBtn = document.getElementById('crawlExportPagesCsvBtn');
+
+  const printReportContainer = document.getElementById('printReport');
+
+  if (exportBtn && exportDropdown) {
+    exportBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      exportDropdown.classList.toggle('hidden');
+      const arrow = exportBtn.querySelector('.dropdown-arrow');
+      if (arrow) {
+        if (exportDropdown.classList.contains('hidden')) {
+          arrow.style.transform = 'rotate(0deg)';
+        } else {
+          arrow.style.transform = 'rotate(180deg)';
+        }
+      }
+    });
+
+    document.addEventListener('click', () => {
+      exportDropdown.classList.add('hidden');
+      const arrow = exportBtn.querySelector('.dropdown-arrow');
+      if (arrow) arrow.style.transform = 'rotate(0deg)';
+    });
+  }
+
+  if (crawlExportBtn && crawlExportDropdown) {
+    crawlExportBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      crawlExportDropdown.classList.toggle('hidden');
+      const arrow = crawlExportBtn.querySelector('.dropdown-arrow');
+      if (arrow) {
+        if (crawlExportDropdown.classList.contains('hidden')) {
+          arrow.style.transform = 'rotate(0deg)';
+        } else {
+          arrow.style.transform = 'rotate(180deg)';
+        }
+      }
+    });
+
+    document.addEventListener('click', () => {
+      crawlExportDropdown.classList.add('hidden');
+      const arrow = crawlExportBtn.querySelector('.dropdown-arrow');
+      if (arrow) arrow.style.transform = 'rotate(0deg)';
+    });
+  }
+
+  // Helper: CSV escape
+  function escapeCsvField(val) {
+    if (val === null || val === undefined) return '';
+    let str = String(val);
+    if (str.includes(',') || str.includes('"') || str.includes('\n') || str.includes('\r')) {
+      str = str.replace(/"/g, '""');
+      return `"${str}"`;
+    }
+    return str;
+  }
+
+  // Helper: CSV download
+  function downloadCSV(csvContent, filename) {
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement("a");
+    if (link.download !== undefined) {
+      const url = URL.createObjectURL(blob);
+      link.setAttribute("href", url);
+      link.setAttribute("download", filename);
+      link.style.visibility = 'hidden';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+  }
+
+  // Export PDF Report handler
+  if (exportPdfBtn) {
+    exportPdfBtn.addEventListener('click', () => {
+      if (!currentScanData) {
+        alert('No scan data available to export. Please run a scan first.');
+        return;
+      }
+      try {
+        const reportHtml = generatePrintableReport(currentScanData);
+        printReportContainer.innerHTML = reportHtml;
+        window.print();
+        // Clear after printing to keep the DOM clean
+        setTimeout(() => {
+          printReportContainer.innerHTML = '';
+        }, 1000);
+      } catch (err) {
+        console.error('Error generating print report:', err);
+        alert('Could not generate the print report. Please try again.');
+      }
+    });
+  }
+
+  // Export Cookies CSV handler
+  if (exportCookiesCsvBtn) {
+    exportCookiesCsvBtn.addEventListener('click', () => {
+      if (!currentScanData) {
+        alert('No scan data available to export.');
+        return;
+      }
+      exportCookiesCsv(currentScanData);
+    });
+  }
+
+  // Export Connections CSV handler
+  if (exportConnectionsCsvBtn) {
+    exportConnectionsCsvBtn.addEventListener('click', () => {
+      if (!currentScanData) {
+        alert('No scan data available to export.');
+        return;
+      }
+      exportConnectionsCsv(currentScanData);
+    });
+  }
+
+  // Export Diagnostics CSV handler
+  if (exportDiagnosticsCsvBtn) {
+    exportDiagnosticsCsvBtn.addEventListener('click', () => {
+      if (!currentScanData) {
+        alert('No scan data available to export.');
+        return;
+      }
+      exportDiagnosticsCsv(currentScanData);
+    });
+  }
+
+  // Crawl Export PDF Report handler
+  if (crawlExportPdfBtn) {
+    crawlExportPdfBtn.addEventListener('click', () => {
+      if (!crawlResults) {
+        alert('No crawl data available to export.');
+        return;
+      }
+      try {
+        const reportHtml = generatePrintableCrawlReport(crawlResults);
+        printReportContainer.innerHTML = reportHtml;
+        window.print();
+        setTimeout(() => {
+          printReportContainer.innerHTML = '';
+        }, 1000);
+      } catch (err) {
+        console.error('Error generating print crawl report:', err);
+        alert('Could not generate the print report.');
+      }
+    });
+  }
+
+  // Crawl Export Pages CSV handler
+  if (crawlExportPagesCsvBtn) {
+    crawlExportPagesCsvBtn.addEventListener('click', () => {
+      if (!crawlResults) {
+        alert('No crawl data available to export.');
+        return;
+      }
+      exportCrawlPagesCsv(crawlResults);
+    });
+  }
+
+  function exportCookiesCsv(data) {
+    const cookies = (data.cookies || []).map(c => ({ ...c, isCookie: true }));
+    const storage = (data.storage || []).map(s => ({ ...s, isCookie: false }));
+    const allItems = [...cookies, ...storage];
+
+    const headers = ['Name', 'Domain', 'Type', 'Category', 'Expiration', 'HttpOnly', 'Secure', 'SameSite', 'Security Issues'];
+    const rows = [headers];
+
+    allItems.forEach(item => {
+      const typeLabel = item.isCookie ? 'Cookie' : (item.storageType === 'LocalStorage' ? 'LocalStorage' : 'SessionStorage');
+      let expiresText = 'N/A';
+      if (item.isCookie) {
+        expiresText = item.session ? 'Session' : formatDate(item.expires);
+      }
+      const issues = item.securityIssues ? item.securityIssues.join('; ') : '';
+
+      rows.push([
+        item.name,
+        item.domain,
+        typeLabel,
+        item.category,
+        expiresText,
+        item.isCookie ? (item.httpOnly ? 'TRUE' : 'FALSE') : 'N/A',
+        item.isCookie ? (item.secure ? 'TRUE' : 'FALSE') : 'N/A',
+        item.isCookie ? item.sameSite : 'N/A',
+        issues
+      ]);
+    });
+
+    const csvContent = rows.map(r => r.map(escapeCsvField).join(',')).join('\n');
+    const filename = `clearload_cookies_${data.domain}.csv`;
+    downloadCSV(csvContent, filename);
+  }
+
+  function exportConnectionsCsv(data) {
+    const connections = data.connections || [];
+    const headers = ['Hostname', 'Classification', 'Request URL', 'Resource Type', 'Method'];
+    const rows = [headers];
+
+    connections.forEach(conn => {
+      const classification = conn.isTracker ? 'Third-Party Tracker' : (conn.isThirdParty ? 'Third-Party Connection' : 'First-Party');
+      rows.push([
+        conn.host,
+        classification,
+        conn.url,
+        conn.resourceType,
+        conn.method
+      ]);
+    });
+
+    const csvContent = rows.map(r => r.map(escapeCsvField).join(',')).join('\n');
+    const filename = `clearload_connections_${data.domain}.csv`;
+    downloadCSV(csvContent, filename);
+  }
+
+  function exportDiagnosticsCsv(data) {
+    const { chapters, groups, resolveChapterStatus } = getDiagnosticsChapters(data);
+    const headers = ['Group', 'Diagnostic Chapter', 'Articles', 'Status', 'Risk Elaboration', 'Finding / Check Item', 'Finding Type', 'Finding Details', 'Recommendations'];
+    const rows = [headers];
+
+    groups.forEach(group => {
+      const chapterMap = {};
+      chapters.forEach(ch => { chapterMap[ch.id] = ch; });
+
+      group.chapterIds.forEach(id => {
+        const ch = chapterMap[id];
+        if (!ch) return;
+
+        const items = ch.getItems();
+        const status = resolveChapterStatus(ch, items);
+        const recs = ch.getRecommendations(items).join('; ');
+        
+        let statusLabel = 'Compliant';
+        if (status === 'fail') statusLabel = 'Non-compliant';
+        else if (status === 'warn') statusLabel = 'Warning';
+
+        if (items.length > 0) {
+          items.forEach(item => {
+            const name = ch.getItemName ? ch.getItemName(item) : (item.name || item.host || 'Item');
+            const details = ch.getItemDetails ? ch.getItemDetails(item) : (item.details || item.url || '');
+            let typeLabel = 'Warning';
+            if (item.isViolation) typeLabel = 'Violation';
+            else if (item.isInfo) typeLabel = 'Info';
+
+            rows.push([
+              group.name,
+              ch.title,
+              ch.articles.join('; '),
+              statusLabel,
+              ch.riskElaboration,
+              name,
+              typeLabel,
+              details,
+              recs
+            ]);
+          });
+        } else {
+          rows.push([
+            group.name,
+            ch.title,
+            ch.articles.join('; '),
+            statusLabel,
+            ch.riskElaboration,
+            'No issues detected',
+            'N/A',
+            'All checks passed successfully.',
+            recs
+          ]);
+        }
+      });
+    });
+
+    const csvContent = rows.map(r => r.map(escapeCsvField).join(',')).join('\n');
+    const filename = `clearload_compliance_action_items_${data.domain}.csv`;
+    downloadCSV(csvContent, filename);
+  }
+
+  function exportCrawlPagesCsv(data) {
+    if (!data || !data.pages) return;
+    const headers = [
+      'URL', 
+      'Status', 
+      'Crawl Depth', 
+      'GDPR Compliance', 
+      'Marketing Cookies', 
+      'Analytics Cookies', 
+      'Outbound Trackers', 
+      'Third-Party Connections', 
+      'Errors'
+    ];
+    const rows = [headers];
+
+    data.pages.forEach(p => {
+      let complianceText = 'N/A';
+      let marketingCount = 0;
+      let analyticsCount = 0;
+      let trackerCount = 0;
+      let otherConnCount = 0;
+
+      if (p.status === 'completed' && p.result) {
+        const hasWarnings = p.result.warnings && p.result.warnings.length > 0;
+        if (!p.result.compliant) {
+          complianceText = 'Non-compliant';
+        } else if (hasWarnings) {
+          complianceText = 'Warning';
+        } else {
+          complianceText = 'Compliant';
+        }
+        marketingCount = p.result.summary.marketingCookies || 0;
+        analyticsCount = p.result.summary.analyticsCookies || 0;
+        trackerCount = p.result.summary.trackingRequests || 0;
+        const connections = p.result.connections || [];
+        otherConnCount = connections.filter(c => c.isThirdParty && !c.isTracker).length;
+      } else if (p.status === 'failed') {
+        complianceText = 'Scan Failed';
+      } else if (p.status === 'skipped') {
+        complianceText = 'Skipped';
+      }
+
+      rows.push([
+        p.url,
+        p.status,
+        p.depth,
+        complianceText,
+        marketingCount,
+        analyticsCount,
+        trackerCount,
+        otherConnCount,
+        p.error || ''
+      ]);
+    });
+
+    const csvContent = rows.map(r => r.map(escapeCsvField).join(',')).join('\n');
+    let domain = 'site';
+    try {
+      if (data.rootUrl) domain = new URL(data.rootUrl).hostname;
+    } catch (e) {
+      domain = 'site';
+    }
+    const filename = `clearload_site_audit_pages_${domain}.csv`;
+    downloadCSV(csvContent, filename);
+  }
+
+  function generatePrintableCrawlReport(data) {
+    const versionEl = document.getElementById('appVersion');
+    const versionStr = versionEl ? versionEl.innerText.trim() : '';
+    const formattedBrand = `ClearLoad${versionStr ? ' ' + versionStr : ''}`;
+    
+    // Header
+    let html = `
+      <div class="print-header">
+        <div class="print-logo">🫧 Clear<strong>Load</strong></div>
+        <div class="print-report-title">
+          <h2>Site Privacy & Compliance Audit Report</h2>
+          <p>Generated on ${new Date().toLocaleString()}</p>
+        </div>
+      </div>
+    `;
+
+    // Metadata Grid
+    const formattedDate = data.timestamp ? new Date(data.timestamp).toLocaleString() : new Date().toLocaleString();
+    html += `
+      <div class="print-meta-grid">
+        <div class="print-meta-item"><strong>Root Audited URL:</strong> ${escapeHtml(data.rootUrl)}</div>
+        <div class="print-meta-item"><strong>Scan Timestamp:</strong> ${formattedDate}</div>
+        <div class="print-meta-item"><strong>Discovery Method:</strong> ${escapeHtml(data.discoveryMethod || 'Auto')}</div>
+        <div class="print-meta-item"><strong>Scan Duration:</strong> ${escapeHtml(data.duration || '0.0s')}</div>
+      </div>
+    `;
+
+    // Stats Grid
+    const completedPages = data.pages.filter(p => p.status === 'completed');
+    
+    const compliantCount = completedPages.filter(p => p.result?.compliant && (!p.result.warnings || p.result.warnings.length === 0)).length;
+    const warningCount = completedPages.filter(p => p.result?.compliant && p.result.warnings && p.result.warnings.length > 0).length;
+    const nonCompliantCount = completedPages.filter(p => !p.result?.compliant).length;
+
+    html += `
+      <div class="print-stats-summary">
+        <div class="print-stat-box">
+          <div class="print-stat-val">${data.pages.length}</div>
+          <div class="print-stat-label">Total Pages</div>
+        </div>
+        <div class="print-stat-box">
+          <div class="print-stat-val" style="color: #15803d;">${compliantCount}</div>
+          <div class="print-stat-label">Compliant Pages</div>
+        </div>
+        <div class="print-stat-box">
+          <div class="print-stat-val" style="color: #b45309;">${warningCount}</div>
+          <div class="print-stat-label">Warnings</div>
+        </div>
+        <div class="print-stat-box">
+          <div class="print-stat-val" style="color: #b91c1c;">${nonCompliantCount}</div>
+          <div class="print-stat-label">Non-Compliant Pages</div>
+        </div>
+      </div>
+    `;
+
+    // Section 1: Top Site Violations
+    const violationsMap = {};
+    completedPages.forEach(p => {
+      if (p.result && p.result.violations) {
+        p.result.violations.forEach(v => {
+          if (!violationsMap[v.type]) {
+            violationsMap[v.type] = { message: v.message, count: 0 };
+          }
+          violationsMap[v.type].count++;
+        });
+      }
+    });
+
+    const topViolations = Object.entries(violationsMap)
+      .map(([type, val]) => ({ type, message: val.message, count: val.count }))
+      .sort((a, b) => b.count - a.count);
+
+    html += `<h3 class="print-section-title">Top Site Violations</h3>`;
+    if (topViolations.length > 0) {
+      html += `<table class="print-table">
+        <thead>
+          <tr>
+            <th>Violation Type</th>
+            <th>Description</th>
+            <th>Impacted Pages</th>
+          </tr>
+        </thead>
+        <tbody>`;
+      topViolations.forEach(v => {
+        html += `
+          <tr>
+            <td style="font-weight: bold; color: #b91c1c;">${escapeHtml(v.type)}</td>
+            <td>${escapeHtml(v.message)}</td>
+            <td style="font-weight: bold; text-align: center;">${v.count} / ${data.pages.length}</td>
+          </tr>
+        `;
+      });
+      html += `</tbody></table>`;
+    } else {
+      html += `<p style="font-size: 0.85rem; color: #15803d; font-weight: 500;"><i class="fa-solid fa-check"></i> No compliance violations detected across any scanned pages.</p>`;
+    }
+
+    // Section 2: Audited Pages Table
+    html += `<h3 class="print-section-title" style="page-break-before: always;">Audited Pages List</h3>`;
+    if (data.pages.length > 0) {
+      html += `
+        <table class="print-table">
+          <thead>
+            <tr>
+              <th>Status</th>
+              <th>Page Path</th>
+              <th>Violations</th>
+              <th>Cookies (M / A)</th>
+              <th>TP Requests (T / O)</th>
+            </tr>
+          </thead>
+          <tbody>
+      `;
+      data.pages.forEach(p => {
+        let statusBadge = '';
+        let violationsText = '—';
+        let cookiesText = '—';
+        let tpText = '—';
+
+        if (p.status === 'completed' && p.result) {
+          const hasWarnings = p.result.warnings && p.result.warnings.length > 0;
+          if (!p.result.compliant) {
+            statusBadge = `<span class="print-badge-non-compliant" style="padding: 2px 6px; border-radius: 4px; font-size: 0.7rem;">Non-compliant</span>`;
+            violationsText = p.result.violations.map(v => v.type).join(', ');
+          } else if (hasWarnings) {
+            statusBadge = `<span class="print-badge-warning" style="padding: 2px 6px; border-radius: 4px; font-size: 0.7rem;">Warning</span>`;
+            violationsText = 'Verify unknown items';
+          } else {
+            statusBadge = `<span class="print-badge-compliant" style="padding: 2px 6px; border-radius: 4px; font-size: 0.7rem;">Compliant</span>`;
+            violationsText = 'None';
+          }
+          cookiesText = `${p.result.summary.marketingCookies} / ${p.result.summary.analyticsCookies}`;
+          const connections = p.result.connections || [];
+          const otherThirdPartyCount = connections.filter(c => c.isThirdParty && !c.isTracker).length;
+          tpText = `${p.result.summary.trackingRequests} / ${otherThirdPartyCount}`;
+        } else if (p.status === 'failed') {
+          statusBadge = `<span class="print-badge-non-compliant" style="padding: 2px 6px; border-radius: 4px; font-size: 0.7rem; background: #374151 !important; color: #ffffff !important;">Failed</span>`;
+          violationsText = p.error || 'Scan error';
+        } else if (p.status === 'skipped') {
+          statusBadge = `<span class="print-badge-warning" style="padding: 2px 6px; border-radius: 4px; font-size: 0.7rem; background: #6b7280 !important; color: #ffffff !important;">Skipped</span>`;
+          violationsText = p.error || 'Robots.txt disallowed';
+        }
+
+        const displayPath = p.url.replace(data.rootUrl, '/');
+
+        html += `
+          <tr>
+            <td style="text-align: center;">${statusBadge}</td>
+            <td style="font-weight: 500; font-size: 0.8rem; word-break: break-all;">${escapeHtml(displayPath)}</td>
+            <td style="font-size: 0.75rem;">${escapeHtml(violationsText)}</td>
+            <td style="text-align: center; font-size: 0.8rem;">${cookiesText}</td>
+            <td style="text-align: center; font-size: 0.8rem;">${tpText}</td>
+          </tr>
+        `;
+      });
+      html += `</tbody></table>`;
+    }
+
+    // Disclaimer
+    html += `
+      <div class="print-disclaimer">
+        <strong>Disclaimer & Liability Notice:</strong> ClearLoad is a technical diagnostic tool designed for website administrators, developers, and compliance officers. The information provided in this report, including compliance gradings and diagnostic evaluations, represents a technical assessment of the page on initial load prior to consent. This report does not constitute legal advice, carries no warranties of any kind (express or implied), and all findings must be verified independently by qualified legal experts. ClearLoad and its maintainers assume no liability for regulatory compliance, audit accuracy, or actions taken based on these findings.
+      </div>
+      <div class="print-app-footer">
+        <div>
+          <strong>${escapeHtml(formattedBrand)}</strong> &bull; Privacy & Cookie Security Auditor
+        </div>
+        <div>
+          Copyright &copy; 2026 nichu42 and contributors &bull; Licensed under AGPL-3.0 &bull; codeberg.org/nichu42/ClearLoad
+        </div>
+      </div>
+    `;
+
+    return html;
+  }
+
+  function generatePrintableReport(data) {
+    const { chapters, groups, resolveChapterStatus } = getDiagnosticsChapters(data);
+    
+    // Header
+    let html = `
+      <div class="print-header">
+        <div class="print-logo">🫧 Clear<strong>Load</strong></div>
+        <div class="print-report-title">
+          <h2>Privacy & Compliance Audit Report</h2>
+          <p>Generated on ${new Date().toLocaleString()}</p>
+        </div>
+      </div>
+    `;
+
+    // Metadata Grid
+    const formattedDate = new Date(data.timestamp).toLocaleString();
+    html += `
+      <div class="print-meta-grid">
+        <div class="print-meta-item"><strong>Audited URL:</strong> ${escapeHtml(data.url)}</div>
+        <div class="print-meta-item"><strong>Scan Timestamp:</strong> ${formattedDate}</div>
+        <div class="print-meta-item"><strong>Protocol & Port:</strong> ${data.url.toLowerCase().startsWith('https://') ? 'HTTPS (Port 443)' : 'HTTP (Port 80)'}</div>
+        <div class="print-meta-item"><strong>Redirected:</strong> ${data.redirected ? `Yes (from ${escapeHtml(data.domain)})` : 'No'}</div>
+      </div>
+    `;
+
+    // Compliance Status Banner
+    let bannerClass = 'compliant';
+    let bannerIcon = 'fa-circle-check';
+    let bannerText = 'COMPLIANT';
+    let bannerDesc = 'This website meets all audited GDPR & ePrivacy compliance standards.';
+    const hasWarnings = data.warnings && data.warnings.length > 0;
+
+    if (!data.compliant) {
+      bannerClass = 'non-compliant';
+      bannerIcon = 'fa-circle-xmark';
+      bannerText = 'NON-COMPLIANT';
+      const reasons = [];
+      if (data.summary.marketingCookies > 0) reasons.push('marketing cookies');
+      if (data.summary.analyticsCookies > 0) reasons.push('analytics cookies');
+      if (data.summary.trackingRequests > 0) reasons.push('ad trackers');
+      const otherThirdPartyCount = data.connections.filter(r => r.isThirdParty && !r.isTracker).length;
+      if (otherThirdPartyCount > 0) reasons.push('third-party hosts');
+      bannerDesc = `GDPR risks detected: ${reasons.join(', ')}. Action required to secure compliance.`;
+    } else if (hasWarnings) {
+      bannerClass = 'warning';
+      bannerIcon = 'fa-circle-question';
+      bannerText = 'UNKNOWN / WARNINGS';
+      bannerDesc = 'Some items require manual audit. Verify unknown cookies/storage keys and secure cookie flags to confirm compliance.';
+    }
+
+    html += `
+      <div class="print-status-banner ${bannerClass}">
+        <i class="fa-solid ${bannerIcon} print-status-icon"></i>
+        <div class="print-status-text">
+          <h3>GDPR Compliance Status: ${bannerText}</h3>
+          <p>${escapeHtml(bannerDesc)}</p>
+        </div>
+      </div>
+    `;
+
+    // Statistics Summary Row
+    const totalCookiesAndStorage = data.summary.totalCookies + (data.summary.totalStorage || 0);
+    html += `
+      <div class="print-stats-summary">
+        <div class="print-stat-box">
+          <div class="print-stat-val">${totalCookiesAndStorage}</div>
+          <div class="print-stat-label">Cookies & Storage</div>
+        </div>
+        <div class="print-stat-box">
+          <div class="print-stat-val">${data.summary.totalRequests}</div>
+          <div class="print-stat-label">External Connections</div>
+        </div>
+        <div class="print-stat-box">
+          <div class="print-stat-val">${data.summary.trackingRequests || 0}</div>
+          <div class="print-stat-label">Trackers Blocked</div>
+        </div>
+        <div class="print-stat-box">
+          <div class="print-stat-val">${data.compliant ? 'Pass' : 'Fail'}</div>
+          <div class="print-stat-label">Overall Audit</div>
+        </div>
+      </div>
+    `;
+
+    // Section 1: Diagnostics
+    html += `<h3 class="print-section-title">Compliance Diagnostics</h3>`;
+
+    groups.forEach(group => {
+      html += `<h4 style="margin: 1.5rem 0 0.75rem 0; color: #502379; text-transform: uppercase; font-size: 0.9rem;">${group.name}</h4>`;
+      
+      const chapterMap = {};
+      chapters.forEach(ch => { chapterMap[ch.id] = ch; });
+
+      group.chapterIds.forEach(id => {
+        const ch = chapterMap[id];
+        if (!ch) return;
+
+        const items = ch.getItems();
+        const status = resolveChapterStatus(ch, items);
+
+        let badgeText = 'Compliant';
+        let badgeClass = 'print-badge-compliant';
+        if (status === 'fail') {
+          badgeText = 'Non-compliant';
+          badgeClass = 'print-badge-non-compliant';
+        } else if (status === 'warn') {
+          badgeText = 'Warning';
+          badgeClass = 'print-badge-warning';
+        }
+
+        html += `
+          <div class="print-chapter-card">
+            <div class="print-chapter-header">
+              <h5 class="print-chapter-title">${ch.title} (${ch.articles.join(', ')})</h5>
+              <span class="print-chapter-badge ${badgeClass}">${badgeText}</span>
+            </div>
+            <p class="print-chapter-desc">${escapeHtml(ch.desc)}</p>
+            <p style="font-size: 0.8rem; color: #444444; margin-bottom: 0.75rem;"><strong>Risk:</strong> ${escapeHtml(ch.riskElaboration)}</p>
+        `;
+
+        // Audit details / findings
+        if (items.length > 0) {
+          html += `<div class="print-chapter-items-title">Detected Items / Findings:</div><ul class="print-chapter-items">`;
+          items.forEach(item => {
+            const name = ch.getItemName ? ch.getItemName(item) : (item.name || item.host || 'Item');
+            const details = ch.getItemDetails ? ch.getItemDetails(item) : (item.details || item.url || '');
+            let issueType = '';
+            if (item.isViolation) issueType = ' <span style="color: #b91c1c; font-weight: bold;">(Violation)</span>';
+            else if (item.isInfo) issueType = ' <span style="color: #15803d; font-weight: bold;">(Info)</span>';
+            else issueType = ' <span style="color: #b45309; font-weight: bold;">(Warning)</span>';
+
+            html += `<li><strong>${escapeHtml(name)}</strong>${issueType} — ${escapeHtml(details)}</li>`;
+          });
+          html += `</ul>`;
+        } else {
+          html += `<p style="font-size: 0.8rem; color: #15803d; font-weight: 500; margin: 0.5rem 0 0 0;"><i class="fa-solid fa-check"></i> No issues found in this chapter.</p>`;
+        }
+
+        // Recommendations
+        const recs = ch.getRecommendations(items);
+        if (recs && recs.length > 0) {
+          html += `<div class="print-chapter-recs-title">Recommendations:</div><ul class="print-chapter-recs">`;
+          recs.forEach(rec => {
+            html += `<li>${rec}</li>`;
+          });
+          html += `</ul>`;
+        }
+
+        html += `</div>`;
+      });
+    });
+
+    // Section 2: Cookies & Local Storage Table
+    html += `<h3 class="print-section-title" style="page-break-before: always;">Cookie & Storage Audit</h3>`;
+    const cookies = (data.cookies || []).map(c => ({ ...c, isCookie: true }));
+    const storage = (data.storage || []).map(s => ({ ...s, isCookie: false }));
+    const allItems = [...cookies, ...storage];
+
+    if (allItems.length > 0) {
+      html += `
+        <table class="print-table">
+          <thead>
+            <tr>
+              <th>Key / Name</th>
+              <th>Domain</th>
+              <th>Type</th>
+              <th>Category</th>
+              <th>Expiration</th>
+              <th>HttpOnly</th>
+              <th>Secure</th>
+              <th>SameSite</th>
+            </tr>
+          </thead>
+          <tbody>
+      `;
+      allItems.forEach(item => {
+        const typeLabel = item.isCookie ? 'Cookie' : (item.storageType === 'LocalStorage' ? 'LocalStorage' : 'SessionStorage');
+        let expiresText = 'N/A';
+        if (item.isCookie) {
+          expiresText = item.session ? 'Session' : formatDate(item.expires);
+        }
+        html += `
+          <tr>
+            <td style="font-weight: bold;">${escapeHtml(item.name)}</td>
+            <td>${escapeHtml(item.domain)}</td>
+            <td>${typeLabel}</td>
+            <td>${escapeHtml(item.category)}</td>
+            <td>${expiresText}</td>
+            <td>${item.isCookie ? (item.httpOnly ? 'Yes' : 'No') : '—'}</td>
+            <td>${item.isCookie ? (item.secure ? 'Yes' : 'No') : '—'}</td>
+            <td>${item.isCookie ? escapeHtml(item.sameSite) : '—'}</td>
+          </tr>
+        `;
+      });
+      html += `</tbody></table>`;
+    } else {
+      html += `<p style="font-size: 0.85rem; font-style: italic;">No cookie or browser storage items detected.</p>`;
+    }
+
+    // Section 3: Outbound Connections Table
+    html += `<h3 class="print-section-title" style="page-break-before: always;">Outbound Network Connections</h3>`;
+    const connections = data.connections || [];
+    if (connections.length > 0) {
+      html += `
+        <table class="print-table">
+          <thead>
+            <tr>
+              <th>Hostname</th>
+              <th>Classification</th>
+              <th>Request URL</th>
+              <th>Type</th>
+              <th>Method</th>
+            </tr>
+          </thead>
+          <tbody>
+      `;
+      connections.forEach(conn => {
+        const classification = conn.isTracker ? 'Third-Party Tracker' : (conn.isThirdParty ? 'Third-Party Connection' : 'First-Party');
+        html += `
+          <tr>
+            <td style="font-weight: bold;">${escapeHtml(conn.host)}</td>
+            <td>${classification}</td>
+            <td style="word-break: break-all; font-family: monospace; font-size: 0.7rem;">${escapeHtml(conn.url)}</td>
+            <td style="text-transform: uppercase;">${escapeHtml(conn.resourceType)}</td>
+            <td>${escapeHtml(conn.method)}</td>
+          </tr>
+        `;
+      });
+      html += `</tbody></table>`;
+    } else {
+      html += `<p style="font-size: 0.85rem; font-style: italic;">No outbound network connections detected.</p>`;
+    }
+
+    // Disclaimer & App Footer info
+    const versionEl = document.getElementById('appVersion');
+    const versionStr = versionEl ? versionEl.innerText.trim() : '';
+    const formattedBrand = `ClearLoad${versionStr ? ' ' + versionStr : ''}`;
+
+    html += `
+      <div class="print-disclaimer">
+        <strong>Disclaimer & Liability Notice:</strong> ClearLoad is a technical diagnostic tool designed for website administrators, developers, and compliance officers. The information provided in this report, including compliance gradings and diagnostic evaluations, represents a technical assessment of the page on initial load prior to consent. This report does not constitute legal advice, carries no warranties of any kind (express or implied), and all findings must be verified independently by qualified legal experts. ClearLoad and its maintainers assume no liability for regulatory compliance, audit accuracy, or actions taken based on these findings.
+      </div>
+      <div class="print-app-footer">
+        <div>
+          <strong>${escapeHtml(formattedBrand)}</strong> &bull; Privacy & Cookie Security Auditor
+        </div>
+        <div>
+          Copyright &copy; 2026 nichu42 and contributors &bull; Licensed under AGPL-3.0 &bull; codeberg.org/nichu42/ClearLoad
+        </div>
+      </div>
+    `;
+
+    return html;
+  }
+
   // Share Button Action (Clipboard Copy)
   const shareBtn = document.getElementById('shareBtn');
   shareBtn.addEventListener('click', async () => {
@@ -1306,13 +2091,10 @@ document.addEventListener('DOMContentLoaded', () => {
     if (overviewContent) overviewContent.classList.remove('hidden');
   }
 
-  function setupDiagnosticsMasterDetail(data) {
+  function getDiagnosticsChapters(data) {
     if (!data.storage) data.storage = [];
     if (!data.iframes) data.iframes = [];
 
-    const list = document.getElementById('diagnosticList');
-    list.innerHTML = '';
-    
     const chapters = [
       {
         id: 'ssl_tls',
@@ -1611,6 +2393,15 @@ document.addEventListener('DOMContentLoaded', () => {
         chapterIds: ['outbound_trackers', 'third_party_hosts', 'embedded_widgets']
       }
     ];
+
+    return { chapters, groups, resolveChapterStatus };
+  }
+
+  function setupDiagnosticsMasterDetail(data) {
+    const list = document.getElementById('diagnosticList');
+    list.innerHTML = '';
+    
+    const { chapters, groups, resolveChapterStatus } = getDiagnosticsChapters(data);
 
     const chapterMap = {};
     chapters.forEach(ch => {
@@ -2860,7 +3651,7 @@ document.addEventListener('DOMContentLoaded', () => {
           <td class="center"><span class="${entry.badge}">${escapeHtml(entry.label)}</span></td>
         `;
       } else {
-        tr.innerHTML = `
+            tr.innerHTML = `
           <td class="font-bold">${escapeHtml(entry.key)}</td>
           <td class="center"><span class="${entry.badge}">${escapeHtml(entry.label)}</span></td>
         `;
@@ -2868,4 +3659,3 @@ document.addEventListener('DOMContentLoaded', () => {
       tableBody.appendChild(tr);
     });
   }
-});

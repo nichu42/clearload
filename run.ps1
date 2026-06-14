@@ -26,7 +26,7 @@ npm install
 Write-Host "$bubble Starting ClearLoad on http://localhost:3000..." -ForegroundColor Green
 try {
     $env:OPEN_BROWSER="true"
-    npm start
+    node server.js
 } finally {
     Remove-Item env:OPEN_BROWSER -ErrorAction SilentlyContinue
 }
