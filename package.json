@@ -14,10 +14,12 @@
     "@fontsource/outfit": "^5.2.8",
     "@fontsource/plus-jakarta-sans": "^5.2.8",
     "@fortawesome/fontawesome-free": "^7.2.0",
+    "cookie-session": "^2.1.1",
     "express": "^5.2.1",
     "express-rate-limit": "^8.5.2",
     "helmet": "^8.2.0",
     "open": "^11.0.0",
+    "openid-client": "^6.8.4",
     "playwright": "^1.60.0"
   }
 }

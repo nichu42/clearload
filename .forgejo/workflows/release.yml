@@ -23,26 +23,29 @@ jobs:
       - name: Run Dictionary Validation
         run: npm test
 
-      - name: Install Buildah
-        run: apt-get update && apt-get install buildah ca-certificates -y
+      - name: Install Buildah and QEMU
+        # qemu-user-static registers binfmt_misc handlers (via its .deb postinst) so the
+        # amd64 runner can execute arm64 binaries — required to build the linux/arm64 image
+        # under emulation. The Dockerfile does no native compilation (only rm/npm ci/chown),
+        # so emulation overhead is small.
+        run: apt-get update && apt-get install buildah ca-certificates qemu-user-static -y
 
-      - name: Build and Push Versioned Tag
-        uses: https://codeberg.org/actions/buildah-simple@main
-        with:
-          tag: "codeberg.org/${{ github.repository_owner }}/clearload:${{ github.ref_name }}"
-          context: .
-          push: true
-          username: ${{ github.actor }}
-          password: ${{ secrets.PACKAGE_TOKEN }}
-          registry: codeberg.org
-
-      - name: Push Latest Tag (re-tag existing image, no rebuild)
+      - name: Build and Push Multi-Arch Manifest (amd64 + arm64)
         env:
           BUILDAH_ISOLATION: chroot
+          IMAGE: "codeberg.org/${{ github.repository_owner }}/clearload"
+          TAG: "${{ github.ref_name }}"
         run: |
           # Configure buildah storage to use vfs inside the container to prevent hanging
           printf '[storage]\ndriver="vfs"\nrunroot="/run/containers/storage"\ngraphroot="/var/lib/containers/storage"\n' | tee /etc/containers/storage.conf
           buildah login -u "${{ github.actor }}" -p "${{ secrets.PACKAGE_TOKEN }}" codeberg.org
-          buildah pull "codeberg.org/${{ github.repository_owner }}/clearload:${{ github.ref_name }}"
-          buildah tag "codeberg.org/${{ github.repository_owner }}/clearload:${{ github.ref_name }}" "codeberg.org/${{ github.repository_owner }}/clearload:latest"
-          buildah push "codeberg.org/${{ github.repository_owner }}/clearload:latest"
+
+          # Build both architectures into a single local manifest list.
+          buildah build --jobs=2 \
+            --platform=linux/amd64,linux/arm64 \
+            --manifest "clearload:${TAG}" \
+            --file Dockerfile .
+
+          # Push the manifest list (and all per-arch images) under the version tag and latest.
+          buildah manifest push --all "clearload:${TAG}" "docker://${IMAGE}:${TAG}"
+          buildah manifest push --all "clearload:${TAG}" "docker://${IMAGE}:latest"

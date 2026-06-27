@@ -3156,6 +3156,61 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
+  // Reflect the OIDC auth state from /api/status into the UI. When OIDC is
+  // disabled the auth controls and gate stay hidden, so the page is unchanged.
+  function applyAuthState(auth) {
+    const controls = document.getElementById('authControls');
+    const userMenu = document.getElementById('authUserMenu');
+    const userName = document.getElementById('authUserName');
+    const gate = document.getElementById('authGate');
+    const searchContainer = document.querySelector('.search-container');
+    const loginBtn = document.getElementById('loginBtn');
+    const logoutBtn = document.getElementById('logoutBtn');
+
+    if (!auth || !auth.oidcEnabled) {
+      if (controls) controls.classList.add('hidden');
+      if (gate) gate.classList.add('hidden');
+      return; // OIDC off — leave the default public UI intact.
+    }
+
+    if (controls) controls.classList.remove('hidden');
+
+    if (loginBtn) {
+      const label = loginBtn.querySelector('span');
+      if (label && auth.providerName) label.innerText = `Sign in with ${auth.providerName}`;
+      loginBtn.onclick = () => { window.location.href = auth.loginUrl || '/auth/login'; };
+    }
+
+    if (logoutBtn) {
+      logoutBtn.onclick = async () => {
+        try {
+          const res = await fetch(auth.logoutUrl || '/auth/logout', { method: 'POST' });
+          const body = await res.json().catch(() => ({}));
+          if (body && body.endSessionUrl) {
+            window.location.href = body.endSessionUrl;
+          } else {
+            window.location.reload();
+          }
+        } catch (e) {
+          window.location.reload();
+        }
+      };
+    }
+
+    if (auth.authenticated) {
+      // Logged in: show the user menu, reveal the scan UI, hide the gate.
+      if (userMenu) userMenu.classList.remove('hidden');
+      if (userName && auth.user) userName.innerText = auth.user.name || auth.user.email || auth.user.sub || 'Signed in';
+      if (gate) gate.classList.add('hidden');
+      if (searchContainer) searchContainer.classList.remove('hidden');
+    } else {
+      // Not logged in: hide the user menu and scan UI, show the sign-in gate.
+      if (userMenu) userMenu.classList.add('hidden');
+      if (gate) gate.classList.remove('hidden');
+      if (searchContainer) searchContainer.classList.add('hidden');
+    }
+  }
+
   // Load and display version from the backend status endpoint
   async function loadAppVersion() {
     try {
@@ -3202,6 +3257,9 @@ document.addEventListener('DOMContentLoaded', () => {
       }
       if (data && data.hasApiKeysConfigured !== undefined) {
         serverHasApiKeysConfigured = data.hasApiKeysConfigured;
+      }
+      if (data && data.auth) {
+        applyAuthState(data.auth);
       }
       updateMaxPagesLimitText();
       updateCrawlModeVisibility();
