@@ -41,7 +41,9 @@ jobs:
           buildah login -u "${{ github.actor }}" -p "${{ secrets.PACKAGE_TOKEN }}" codeberg.org
 
           # Build both architectures into a single local manifest list.
-          buildah build --jobs=2 \
+          # --jobs=1 builds arches sequentially to keep peak memory low (the
+          # Playwright base image is ~2GB; parallel vfs builds OOM the runner).
+          buildah build --jobs=1 \
             --platform=linux/amd64,linux/arm64 \
             --manifest "clearload:${TAG}" \
             --file Dockerfile .
