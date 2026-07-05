@@ -422,8 +422,54 @@
                         </div>
                     </div>
 
+                    <!-- View Toggle -->
+                    <div class="view-toggle-row">
+                        <div class="toggle-group">
+                            <button id="crawlViewTableBtn" class="toggle-btn active" type="button">
+                                <i class="fa-solid fa-list"></i> Table View
+                            </button>
+                            <button id="crawlViewGraphBtn" class="toggle-btn" type="button">
+                                <i class="fa-solid fa-diagram-project"></i> Visual Sitemap / Link Graph
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Interactive Link Graph View -->
+                    <div id="crawlGraphContainer" class="glass-card crawl-graph-card hidden">
+                        <div class="graph-header">
+                            <div class="graph-title-container">
+                                <h3>Interactive Sitemap Link Graph</h3>
+                                <p class="section-desc">Visual map of page linkages across the scanned site. Drag nodes to explore; click a node to view page audit details.</p>
+                            </div>
+                            <div class="graph-legend">
+                                <span class="legend-item"><span class="legend-dot compliant-dot"></span> Compliant</span>
+                                <span class="legend-item"><span class="legend-dot warning-dot"></span> Warnings</span>
+                                <span class="legend-item"><span class="legend-dot non-compliant-dot"></span> Non-Compliant</span>
+                                <span class="legend-item"><span class="legend-dot failed-dot"></span> Failed</span>
+                            </div>
+                            <div class="graph-actions">
+                                <button id="resetGraphBtn" class="action-btn" type="button" title="Reset view zoom/pan">
+                                    <i class="fa-solid fa-arrows-to-dot"></i> Reset View
+                                </button>
+                            </div>
+                        </div>
+                        <div class="graph-viewport-wrapper" id="graphViewportWrapper">
+                            <canvas id="crawlGraphCanvas"></canvas>
+                            <div id="graphTooltip" class="graph-tooltip hidden">
+                                <div class="tooltip-url" id="tooltipUrl">/about</div>
+                                <div class="tooltip-status status-non-compliant" id="tooltipStatus">Non-compliant</div>
+                                <div class="tooltip-details">
+                                    <div><i class="fa-solid fa-bug text-danger"></i> <span id="tooltipViolations">3</span> violations</div>
+                                    <div><i class="fa-solid fa-cookie text-warning"></i> <span id="tooltipCookies">2</span> cookies</div>
+                                    <div><i class="fa-solid fa-network-wired text-info"></i> <span id="tooltipRequests">15</span> requests</div>
+                                </div>
+                                <div class="tooltip-click-prompt">Click node to view audit report</div>
+                            </div>
+                        </div>
+                    </div>
+
                     <!-- Top Issues & Pages List Grid -->
-                    <div class="crawl-details-layout">
+                    <div class="crawl-details-layout" id="crawlDetailsLayout">
                         <!-- Left column: Top Issues -->
                         <div class="glass-card top-issues-card">
                             <h3>Top Site Violations</h3>

@@ -20,6 +20,5 @@ yarn-error.log*
 .DS_Store
 Thumbs.db
 AGENTS.md
-suggestions.md
 test_crawl.js
 scratch/

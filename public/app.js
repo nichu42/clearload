@@ -147,7 +147,12 @@ document.addEventListener('DOMContentLoaded', () => {
   const backToOverviewBtn = document.getElementById('back-to-overview');
   const breadcrumbPageUrl = document.getElementById('breadcrumb-page-url');
 
-
+  // View Toggle elements
+  const crawlViewTableBtn = document.getElementById('crawlViewTableBtn');
+  const crawlViewGraphBtn = document.getElementById('crawlViewGraphBtn');
+  const crawlDetailsLayout = document.getElementById('crawlDetailsLayout');
+  const crawlGraphContainer = document.getElementById('crawlGraphContainer');
+  const resetGraphBtn = document.getElementById('resetGraphBtn');
 
   // --- CRAWL UX EVENT BINDINGS & LOGIC ---
 
@@ -214,6 +219,7 @@ document.addEventListener('DOMContentLoaded', () => {
     errorSection.classList.add('hidden');
     dashboardSection.classList.add('hidden');
     crawlOverviewSection.classList.add('hidden');
+    stopGraphAnimation();
     crawlProgressSection.classList.remove('hidden');
 
     discoveryStatusBadge.textContent = 'Initializing...';
@@ -567,6 +573,17 @@ document.addEventListener('DOMContentLoaded', () => {
       else btn.classList.remove('active');
     });
     renderPagesTable('all');
+
+    // Reset view toggle to Table View by default
+    if (crawlViewTableBtn && crawlViewGraphBtn) {
+      crawlViewTableBtn.classList.add('active');
+      crawlViewGraphBtn.classList.remove('active');
+      crawlDetailsLayout.classList.remove('hidden');
+      crawlGraphContainer.classList.add('hidden');
+    }
+    
+    // Prepare the crawl graph data structure
+    prepareCrawlGraph(data);
   }
 
   function renderPagesTable(filter) {
@@ -688,6 +705,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
       // Hide crawl overview
       crawlOverviewSection.classList.add('hidden');
+      stopGraphAnimation();
 
       // Show dashboard
       dashboardSection.classList.remove('hidden');
@@ -709,6 +727,13 @@ document.addEventListener('DOMContentLoaded', () => {
     crawlBreadcrumb.style.display = 'none';
     crawlOverviewSection.classList.remove('hidden');
     crawlOverviewSection.scrollIntoView({ behavior: 'smooth' });
+    
+    // Resume visual sitemap ticker if graph tab was active
+    if (crawlViewGraphBtn && crawlViewGraphBtn.classList.contains('active')) {
+      resizeGraphCanvas();
+      resetGraphView();
+      reheatGraph();
+    }
   }
 
   backToOverviewBtn.addEventListener('click', backToOverview);
@@ -725,6 +750,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   newCrawlScanBtn.addEventListener('click', () => {
     crawlOverviewSection.classList.add('hidden');
+    stopGraphAnimation();
     document.querySelector('.hero-section').style.display = 'block';
     
     const newRelativePathQuery = window.location.pathname;
@@ -3717,3 +3743,672 @@ document.addEventListener('DOMContentLoaded', () => {
       tableBody.appendChild(tr);
     });
   }
+
+  // --- CRAWL VISUAL SITEMAP / LINK GRAPH VIEW IMPLEMENTATION ---
+  let graphAnimationId = null;
+  let graphNodes = [];
+  let graphLinks = [];
+  let graphHoveredNode = null;
+  let graphDragNode = null;
+  let lastWidth = 0;
+  let lastHeight = 0;
+  
+  // Pan and zoom state
+  let graphPan = { x: 0, y: 0 };
+  let graphZoom = 1.0;
+  let isPanning = false;
+  let panStart = { x: 0, y: 0 };
+  
+  // Canvas & Context
+  let graphCanvas = null;
+  let graphCtx = null;
+  let eventsBound = false;
+  
+  // Physics cooling (Alpha decay)
+  let graphAlpha = 1.0;
+
+  function stopGraphAnimation() {
+    if (graphAnimationId) {
+      cancelAnimationFrame(graphAnimationId);
+      graphAnimationId = null;
+    }
+    hideTooltip();
+  }
+
+  function reheatGraph() {
+    graphAlpha = 1.0;
+    if (!graphAnimationId && !crawlGraphContainer.classList.contains('hidden')) {
+      runGraphTicker();
+    }
+  }
+
+  function prepareCrawlGraph(data) {
+    graphCanvas = document.getElementById('crawlGraphCanvas');
+    if (!graphCanvas) return;
+    graphCtx = graphCanvas.getContext('2d');
+    
+    // Stop any existing animation loop
+    stopGraphAnimation();
+    
+    // Extract pages that are completed or failed
+    const pages = data.pages || [];
+    if (pages.length === 0) return;
+    
+    // Setup virtual dimensions for initial coordinates
+    const width = 800;
+    const height = 500;
+    
+    // Normalize URL helper
+    function getNormalizedKey(urlStr) {
+      try {
+        const url = new URL(urlStr);
+        url.hash = '';
+        url.search = '';
+        let pathname = url.pathname;
+        if (pathname.endsWith('/') && pathname.length > 1) {
+          pathname = pathname.slice(0, -1);
+        }
+        return `${url.host.toLowerCase()}${pathname.toLowerCase()}`;
+      } catch (e) {
+        return urlStr.toLowerCase().replace(/\/$/, '');
+      }
+    }
+    
+    // Create nodes
+    graphNodes = pages.map((p, idx) => {
+      // Circle layout initialization
+      const angle = (idx / pages.length) * Math.PI * 2;
+      const radius = 180; // Spread nodes out initially in a 180px radius circle
+      
+      // Determine compliance category
+      let statusCategory = 'failed';
+      let violationsCount = 0;
+      let cookiesCount = 0;
+      let requestsCount = 0;
+      
+      if (p.status === 'completed' && p.result) {
+        violationsCount = p.result.violations ? p.result.violations.length : 0;
+        cookiesCount = p.result.cookies ? p.result.cookies.length : 0;
+        requestsCount = p.result.summary ? p.result.summary.thirdPartyRequests : 0;
+        
+        if (violationsCount > 0) {
+          statusCategory = 'non-compliant';
+        } else if (p.result.warnings && p.result.warnings.length > 0) {
+          statusCategory = 'warning';
+        } else {
+          statusCategory = 'compliant';
+        }
+      }
+      
+      return {
+        index: idx,
+        url: p.url,
+        resolvedUrl: p.resolvedUrl || p.url,
+        displayPath: getDisplayPath(p.resolvedUrl || p.url),
+        status: p.status,
+        statusCategory, // 'compliant', 'warning', 'non-compliant', 'failed'
+        violationsCount,
+        cookiesCount,
+        requestsCount,
+        x: width / 2 + Math.cos(angle) * radius + (Math.random() - 0.5) * 40,
+        y: height / 2 + Math.sin(angle) * radius + (Math.random() - 0.5) * 40,
+        vx: 0,
+        vy: 0,
+        radius: 14 // Base node hit radius
+      };
+    });
+    
+    // Create node mapping for link resolution
+    const nodeMap = {};
+    graphNodes.forEach(node => {
+      nodeMap[getNormalizedKey(node.url)] = node;
+      nodeMap[getNormalizedKey(node.resolvedUrl)] = node;
+    });
+    
+    // Build links
+    graphLinks = [];
+    const seenLinks = new Set();
+    
+    pages.forEach((p, sourceIdx) => {
+      if (p.status !== 'completed' || !p.result || !p.result.discoveredLinks) return;
+      
+      p.result.discoveredLinks.forEach(linkUrl => {
+        const targetNode = nodeMap[getNormalizedKey(linkUrl)];
+        if (targetNode && targetNode.index !== sourceIdx) {
+          const key = `${sourceIdx}->${targetNode.index}`;
+          if (!seenLinks.has(key)) {
+            seenLinks.add(key);
+            graphLinks.push({
+              source: graphNodes[sourceIdx],
+              target: targetNode
+            });
+          }
+        }
+      });
+    });
+    
+    // Reset Zoom and Pan to center
+    resetGraphView();
+    
+    // Wire up events if they haven't been wired yet
+    setupGraphEvents();
+  }
+
+  function resizeGraphCanvas() {
+    if (!graphCanvas) return;
+    const rect = graphCanvas.parentElement.getBoundingClientRect();
+    graphCanvas.width = rect.width;
+    graphCanvas.height = rect.height;
+  }
+
+  function resetGraphView() {
+    if (!graphCanvas) return;
+    graphZoom = 1.0;
+    graphPan = { x: 0, y: 0 };
+    
+    // If we have nodes, center them
+    if (graphNodes.length > 0) {
+      // Find bounding box of nodes
+      let minX = Infinity, maxX = -Infinity;
+      let minY = Infinity, maxY = -Infinity;
+      
+      graphNodes.forEach(n => {
+        if (n.x < minX) minX = n.x;
+        if (n.x > maxX) maxX = n.x;
+        if (n.y < minY) minY = n.y;
+        if (n.y > maxY) maxY = n.y;
+      });
+      
+      const graphW = maxX - minX || 1;
+      const graphH = maxY - minY || 1;
+      
+      const graphCenterX = minX + graphW / 2;
+      const graphCenterY = minY + graphH / 2;
+      
+      graphPan.x = graphCanvas.width / 2 - graphCenterX;
+      graphPan.y = graphCanvas.height / 2 - graphCenterY;
+    }
+    hideTooltip();
+    drawGraph();
+  }
+
+  function updateGraphPhysics() {
+    if (graphNodes.length === 0) return;
+    
+    const width = graphCanvas.width || 800;
+    const height = graphCanvas.height || 500;
+    const centerX = width / 2;
+    const centerY = height / 2;
+    
+    const repulsion = 600;
+    const attraction = 0.01;
+    const restLength = 150;
+    const gravity = 0.002;
+    const damping = 0.82;
+    
+    // 1. Repulsion force between all nodes (linear dropoff, protects overlap/div-by-zero)
+    for (let i = 0; i < graphNodes.length; i++) {
+      const nodeA = graphNodes[i];
+      for (let j = i + 1; j < graphNodes.length; j++) {
+        const nodeB = graphNodes[j];
+        let dx = nodeB.x - nodeA.x;
+        let dy = nodeB.y - nodeA.y;
+        
+        // Handle exact overlaps
+        if (dx === 0 && dy === 0) {
+          dx = Math.random() - 0.5;
+          dy = Math.random() - 0.5;
+        }
+        
+        const distSq = dx * dx + dy * dy;
+        const dist = Math.sqrt(distSq) || 0.1;
+        
+        if (dist < 500) {
+          const force = (repulsion / (dist + 10)) * graphAlpha;
+          const fx = (dx / dist) * force;
+          const fy = (dy / dist) * force;
+          
+          nodeA.vx -= fx;
+          nodeA.vy -= fy;
+          nodeB.vx += fx;
+          nodeB.vy += fy;
+        }
+      }
+    }
+    
+    // 2. Attraction force along links
+    for (let i = 0; i < graphLinks.length; i++) {
+      const link = graphLinks[i];
+      const dx = link.target.x - link.source.x;
+      const dy = link.target.y - link.source.y;
+      const dist = Math.sqrt(dx * dx + dy * dy) || 0.1;
+      
+      const force = (dist - restLength) * attraction * graphAlpha;
+      const fx = (dx / dist) * force;
+      const fy = (dy / dist) * force;
+      
+      link.source.vx += fx;
+      link.source.vy += fy;
+      link.target.vx -= fx;
+      link.target.vy -= fy;
+    }
+    
+    // 3. Gravity towards center & update positions
+    for (let i = 0; i < graphNodes.length; i++) {
+      const node = graphNodes[i];
+      
+      if (node === graphDragNode) {
+        node.vx = 0;
+        node.vy = 0;
+        continue;
+      }
+      
+      const dx = centerX - node.x;
+      const dy = centerY - node.y;
+      
+      node.vx += dx * gravity * graphAlpha;
+      node.vy += dy * gravity * graphAlpha;
+      
+      node.vx *= damping;
+      node.vy *= damping;
+      
+      node.x += node.vx;
+      node.y += node.vy;
+    }
+
+    // 4. Collision resolution: prevent overlap completely to solve density issues
+    for (let i = 0; i < graphNodes.length; i++) {
+      const nodeA = graphNodes[i];
+      for (let j = i + 1; j < graphNodes.length; j++) {
+        const nodeB = graphNodes[j];
+        let dx = nodeB.x - nodeA.x;
+        let dy = nodeB.y - nodeA.y;
+        if (dx === 0 && dy === 0) {
+          dx = Math.random() - 0.5;
+          dy = Math.random() - 0.5;
+        }
+        const distSq = dx * dx + dy * dy;
+        const dist = Math.sqrt(distSq) || 0.1;
+        
+        // Comfortable margin: radius of A + radius of B + extra margin
+        const minDist = nodeA.radius + nodeB.radius + 36;
+        if (dist < minDist) {
+          const overlap = minDist - dist;
+          const pushX = (dx / dist) * overlap * 0.5;
+          const pushY = (dy / dist) * overlap * 0.5;
+          
+          if (nodeA !== graphDragNode) {
+            nodeA.x -= pushX;
+            nodeA.y -= pushY;
+          }
+          if (nodeB !== graphDragNode) {
+            nodeB.x += pushX;
+            nodeB.y += pushY;
+          }
+        }
+      }
+    }
+  }
+
+  function drawGraph() {
+    if (!graphCanvas || !graphCtx) return;
+    
+    // Clear canvas
+    graphCtx.clearRect(0, 0, graphCanvas.width, graphCanvas.height);
+    
+    // Apply Zoom & Pan
+    graphCtx.save();
+    graphCtx.translate(graphPan.x, graphPan.y);
+    graphCtx.scale(graphZoom, graphZoom);
+    
+    // 1. Draw Links
+    graphLinks.forEach(link => {
+      graphCtx.beginPath();
+      graphCtx.moveTo(link.source.x, link.source.y);
+      graphCtx.lineTo(link.target.x, link.target.y);
+      
+      const isHighlighted = (graphHoveredNode && (link.source === graphHoveredNode || link.target === graphHoveredNode));
+      
+      if (isHighlighted) {
+        graphCtx.strokeStyle = 'rgba(139, 92, 246, 0.45)';
+        graphCtx.lineWidth = 2.5;
+      } else {
+        graphCtx.strokeStyle = 'rgba(255, 255, 255, 0.08)';
+        graphCtx.lineWidth = 1.2;
+      }
+      graphCtx.stroke();
+      
+      // Draw directed arrowhead near the target node boundary
+      drawArrowhead(graphCtx, link.source.x, link.source.y, link.target.x, link.target.y, link.target.radius + 4, isHighlighted);
+    });
+    
+    // 2. Draw Nodes
+    graphNodes.forEach(node => {
+      const isHovered = (node === graphHoveredNode);
+      
+      // Node Color Mapping
+      let nodeColor = '#6b7280'; // failed / default
+      if (node.statusCategory === 'compliant') {
+        nodeColor = 'hsl(145, 80%, 45%)';
+      } else if (node.statusCategory === 'warning') {
+        nodeColor = 'hsl(38, 92%, 50%)';
+      } else if (node.statusCategory === 'non-compliant') {
+        nodeColor = 'hsl(350, 85%, 60%)';
+      }
+      
+      graphCtx.save();
+      
+      // Shadow / Glow effect for hovered or non-compliant nodes
+      if (isHovered) {
+        graphCtx.shadowBlur = 18;
+        graphCtx.shadowColor = nodeColor;
+      } else if (node.statusCategory === 'non-compliant') {
+        graphCtx.shadowBlur = 8;
+        graphCtx.shadowColor = nodeColor;
+      }
+      
+      // Draw outer shell (circle border)
+      graphCtx.beginPath();
+      graphCtx.arc(node.x, node.y, node.radius, 0, Math.PI * 2);
+      graphCtx.fillStyle = isHovered ? '#0b0d19' : 'rgba(11, 13, 25, 0.9)';
+      graphCtx.fill();
+      graphCtx.strokeStyle = nodeColor;
+      graphCtx.lineWidth = isHovered ? 3.5 : 2.0;
+      graphCtx.stroke();
+      
+      // Draw inner core
+      graphCtx.beginPath();
+      graphCtx.arc(node.x, node.y, node.radius * 0.45, 0, Math.PI * 2);
+      graphCtx.fillStyle = nodeColor;
+      graphCtx.fill();
+      
+      graphCtx.restore();
+      
+      // Draw Path Label
+      graphCtx.font = isHovered ? 'bold 11px Outfit, sans-serif' : '10px Outfit, sans-serif';
+      graphCtx.fillStyle = isHovered ? '#ffffff' : 'rgba(243, 244, 246, 0.85)';
+      graphCtx.textAlign = 'center';
+      graphCtx.textBaseline = 'top';
+      
+      const displayLabel = node.displayPath === '/' ? '/' : node.displayPath;
+      let truncated = displayLabel;
+      if (truncated.length > 25) {
+        truncated = truncated.slice(0, 22) + '...';
+      }
+      graphCtx.fillText(truncated, node.x, node.y + node.radius + 6);
+    });
+    
+    graphCtx.restore();
+  }
+
+  function drawArrowhead(ctx, fromX, fromY, toX, toY, offset, isHighlighted) {
+    const dx = toX - fromX;
+    const dy = toY - fromY;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    if (dist < 30) return; // too close
+    
+    const tX = toX - (dx / dist) * offset;
+    const tY = toY - (dy / dist) * offset;
+    
+    const angle = Math.atan2(dy, dx);
+    const arrowSize = isHighlighted ? 7 : 5;
+    
+    ctx.save();
+    ctx.translate(tX, tY);
+    ctx.rotate(angle);
+    
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.lineTo(-arrowSize, -arrowSize * 0.6);
+    ctx.lineTo(-arrowSize, arrowSize * 0.6);
+    ctx.closePath();
+    
+    ctx.fillStyle = isHighlighted ? 'rgba(139, 92, 246, 0.6)' : 'rgba(255, 255, 255, 0.15)';
+    ctx.fill();
+    ctx.restore();
+  }
+
+  function findNodeAt(worldX, worldY) {
+    for (let i = 0; i < graphNodes.length; i++) {
+      const node = graphNodes[i];
+      const dx = worldX - node.x;
+      const dy = worldY - node.y;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      if (dist <= node.radius + 6) {
+        return node;
+      }
+    }
+    return null;
+  }
+
+  function updateTooltip(node, screenX, screenY) {
+    const tooltip = document.getElementById('graphTooltip');
+    if (!tooltip) return;
+    
+    const urlEl = document.getElementById('tooltipUrl');
+    const statusEl = document.getElementById('tooltipStatus');
+    const violationsEl = document.getElementById('tooltipViolations');
+    const cookiesEl = document.getElementById('tooltipCookies');
+    const requestsEl = document.getElementById('tooltipRequests');
+    
+    urlEl.textContent = node.displayPath === '/' ? node.url : node.displayPath;
+    
+    statusEl.className = 'tooltip-status';
+    if (node.statusCategory === 'compliant') {
+      statusEl.classList.add('status-compliant');
+      statusEl.textContent = 'Compliant';
+    } else if (node.statusCategory === 'warning') {
+      statusEl.classList.add('status-warning');
+      statusEl.textContent = 'Warnings';
+    } else if (node.statusCategory === 'non-compliant') {
+      statusEl.classList.add('status-non-compliant');
+      statusEl.textContent = 'Non-compliant';
+    } else {
+      statusEl.classList.add('status-failed');
+      statusEl.textContent = 'Failed';
+    }
+    
+    violationsEl.textContent = node.violationsCount;
+    cookiesEl.textContent = node.cookiesCount;
+    requestsEl.textContent = node.requestsCount;
+    
+    tooltip.classList.remove('hidden');
+    
+    const wrapper = document.getElementById('graphViewportWrapper');
+    const wrapperRect = wrapper.getBoundingClientRect();
+    const tooltipRect = tooltip.getBoundingClientRect();
+    
+    let left = screenX + 15;
+    let top = screenY - tooltipRect.height - 15;
+    
+    if (left + tooltipRect.width > wrapperRect.width) {
+      left = screenX - tooltipRect.width - 15;
+    }
+    if (top < 0) {
+      top = screenY + 15;
+    }
+    
+    tooltip.style.left = `${left}px`;
+    tooltip.style.top = `${top}px`;
+  }
+  
+  function hideTooltip() {
+    const tooltip = document.getElementById('graphTooltip');
+    if (tooltip) {
+      tooltip.classList.add('hidden');
+    }
+  }
+
+  function setupGraphEvents() {
+    if (eventsBound) return;
+    eventsBound = true;
+    
+    const wrapper = document.getElementById('graphViewportWrapper');
+    if (!wrapper || !graphCanvas) return;
+    
+    wrapper.addEventListener('wheel', (e) => {
+      e.preventDefault();
+      const zoomFactor = 1.1;
+      
+      const rect = graphCanvas.getBoundingClientRect();
+      const mouseX = e.clientX - rect.left;
+      const mouseY = e.clientY - rect.top;
+      
+      const worldX = (mouseX - graphPan.x) / graphZoom;
+      const worldY = (mouseY - graphPan.y) / graphZoom;
+      
+      if (e.deltaY < 0) {
+        graphZoom = Math.min(graphZoom * zoomFactor, 3.5);
+      } else {
+        graphZoom = Math.max(graphZoom / zoomFactor, 0.35);
+      }
+      
+      graphPan.x = mouseX - worldX * graphZoom;
+      graphPan.y = mouseY - worldY * graphZoom;
+      drawGraph();
+    }, { passive: false });
+    
+    graphCanvas.addEventListener('mousedown', (e) => {
+      const rect = graphCanvas.getBoundingClientRect();
+      const mouseX = e.clientX - rect.left;
+      const mouseY = e.clientY - rect.top;
+      
+      const worldX = (mouseX - graphPan.x) / graphZoom;
+      const worldY = (mouseY - graphPan.y) / graphZoom;
+      
+      const clickedNode = findNodeAt(worldX, worldY);
+      if (clickedNode) {
+        graphDragNode = clickedNode;
+        clickedNode.fx = clickedNode.x;
+        clickedNode.fy = clickedNode.y;
+        reheatGraph();
+      } else {
+        isPanning = true;
+        panStart.x = mouseX - graphPan.x;
+        panStart.y = mouseY - graphPan.y;
+      }
+    });
+    
+    window.addEventListener('mousemove', (e) => {
+      if (!graphCanvas || !crawlGraphContainer || crawlGraphContainer.classList.contains('hidden')) return;
+      
+      const rect = graphCanvas.getBoundingClientRect();
+      const mouseX = e.clientX - rect.left;
+      const mouseY = e.clientY - rect.top;
+      
+      const worldX = (mouseX - graphPan.x) / graphZoom;
+      const worldY = (mouseY - graphPan.y) / graphZoom;
+      
+      if (graphDragNode) {
+        graphDragNode.x = worldX;
+        graphDragNode.y = worldY;
+        graphDragNode.fx = worldX;
+        graphDragNode.fy = worldY;
+        updateTooltip(graphDragNode, mouseX, mouseY);
+        reheatGraph();
+      } else if (isPanning) {
+        graphPan.x = mouseX - panStart.x;
+        graphPan.y = mouseY - panStart.y;
+        drawGraph();
+      } else {
+        const hovered = findNodeAt(worldX, worldY);
+        if (hovered !== graphHoveredNode) {
+          graphHoveredNode = hovered;
+          if (hovered) {
+            updateTooltip(hovered, mouseX, mouseY);
+          } else {
+            hideTooltip();
+          }
+          drawGraph();
+        } else if (hovered) {
+          updateTooltip(hovered, mouseX, mouseY);
+        }
+      }
+    });
+    
+    window.addEventListener('mouseup', (e) => {
+      if (graphDragNode) {
+        graphDragNode.fx = null;
+        graphDragNode.fy = null;
+        graphDragNode = null;
+      }
+      isPanning = false;
+    });
+    
+    graphCanvas.addEventListener('click', (e) => {
+      const rect = graphCanvas.getBoundingClientRect();
+      const mouseX = e.clientX - rect.left;
+      const mouseY = e.clientY - rect.top;
+      
+      const worldX = (mouseX - graphPan.x) / graphZoom;
+      const worldY = (mouseY - graphPan.y) / graphZoom;
+      
+      const clickedNode = findNodeAt(worldX, worldY);
+      if (clickedNode) {
+        window.drillIntoPage(clickedNode.index);
+      }
+    });
+    
+    if (resetGraphBtn) {
+      resetGraphBtn.addEventListener('click', resetGraphView);
+    }
+    
+    const resizeObserver = new ResizeObserver(() => {
+      if (crawlGraphContainer && !crawlGraphContainer.classList.contains('hidden')) {
+        const rect = graphCanvas.parentElement.getBoundingClientRect();
+        if (rect.width > 0 && rect.height > 0) {
+          const sizeChangedFromZero = (lastWidth === 0 || lastHeight === 0);
+          resizeGraphCanvas();
+          if (sizeChangedFromZero) {
+            resetGraphView();
+          } else {
+            drawGraph();
+          }
+          lastWidth = rect.width;
+          lastHeight = rect.height;
+        }
+      }
+    });
+    resizeObserver.observe(wrapper);
+  }
+
+  function runGraphTicker() {
+    if (crawlGraphContainer.classList.contains('hidden')) {
+      stopGraphAnimation();
+      return;
+    }
+    
+    updateGraphPhysics();
+    drawGraph();
+    
+    graphAlpha *= 0.975; // Settle decay - gentler
+    if (graphAlpha > 0.005) {
+      graphAnimationId = requestAnimationFrame(runGraphTicker);
+    } else {
+      graphAlpha = 0;
+      graphAnimationId = null; // Cooled down successfully
+    }
+  }
+
+  // View Toggle event listeners
+  if (crawlViewTableBtn && crawlViewGraphBtn) {
+    crawlViewTableBtn.addEventListener('click', () => {
+      crawlViewTableBtn.classList.add('active');
+      crawlViewGraphBtn.classList.remove('active');
+      crawlDetailsLayout.classList.remove('hidden');
+      crawlGraphContainer.classList.add('hidden');
+      stopGraphAnimation();
+    });
+    
+    crawlViewGraphBtn.addEventListener('click', () => {
+      crawlViewGraphBtn.classList.add('active');
+      crawlViewTableBtn.classList.remove('active');
+      crawlDetailsLayout.classList.add('hidden');
+      crawlGraphContainer.classList.remove('hidden');
+      
+      resizeGraphCanvas();
+      resetGraphView();
+      reheatGraph();
+    });
+  }
+});

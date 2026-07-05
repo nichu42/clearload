@@ -504,7 +504,7 @@ export async function runCrawl(rootUrl, options = {}, progressCallback = () => {
     let firstPageResult;
     try {
       firstPageResult = await runAuditWithBrowser(browser, rootUrl, {
-        extractLinks: isCrawlMode && (rootDepth < maxDepth),
+        extractLinks: true,
         crawlScope: scope,
         isRootPage: true,
         authUsername: options.authUsername,
@@ -632,7 +632,7 @@ export async function runCrawl(rootUrl, options = {}, progressCallback = () => {
 
         try {
           const result = await runAuditWithBrowser(browser, entry.url, {
-            extractLinks: isCrawlMode && (entry.depth < maxDepth),
+            extractLinks: true,
             crawlScope: scope,
             cachedTlsResult,
             skipHttpFallback: true,

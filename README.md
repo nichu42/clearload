@@ -1,7 +1,7 @@
 # 🫧 ClearLoad
 
 <p align="left">
-  <a href="https://codeberg.org/nichu42/ClearLoad/releases"><img src="https://img.shields.io/badge/Version-0.5.0-007EC6?style=for-the-badge" alt="Version" /></a>&nbsp;
+  <a href="https://codeberg.org/nichu42/ClearLoad/releases"><img src="https://img.shields.io/badge/Version-0.6.0-007EC6?style=for-the-badge" alt="Version" /></a>&nbsp;
   <a href="https://codeberg.org/nichu42/-/packages/container/clearload"><img src="https://img.shields.io/badge/Hosted_on-Codeberg-2185D0?style=for-the-badge&logo=gitea&logoColor=white" alt="Hosted on Codeberg" /></a>&nbsp;
   <a href="https://hub.docker.com/r/nichu42/clearload"><img src="https://img.shields.io/docker/pulls/nichu42/clearload?style=for-the-badge&logo=docker&logoColor=white" alt="Docker Pulls" /></a>&nbsp;
   <a href="https://clearload.42bit.io"><img src="https://img.shields.io/badge/Live_Demo-clearload.42bit.io-7C3AED?style=for-the-badge&logo=windowsterminal&logoColor=white" alt="Live Demo" /></a>&nbsp;
