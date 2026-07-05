@@ -8,6 +8,7 @@ import { runAudit } from './audit.js';
 import { runCrawl } from './crawl.js';
 import { validateAndNormalizeUrl, isPrivateIP } from './lib/ssrf-guard.js';
 import { RobotsTxt } from './lib/robots-parser.js';
+import * as oidcAuth from './lib/oidc-auth.js';
 import open from 'open';
 import dns from 'dns';
 import crypto from 'crypto';
@@ -143,7 +144,11 @@ app.use(helmet({
 // Enable JSON middleware for POST bodies
 app.use(express.json({ limit: '1kb' }));
 
-
+// Stateless signed-cookie session, used only by the optional OIDC layer. When
+// OIDC is disabled this is a no-op passthrough (no cookie is ever set), so the
+// app keeps its zero-server-state design. Must run before the /api security
+// guard and the auth routes, both of which read req.session.
+app.use(oidcAuth.sessionMiddleware());
 
 // Cache-control helpers. Per the project policy:
 //   - Self-hosted vendor assets (text fonts via @fontsource + icon fonts via
@@ -267,7 +272,15 @@ const apiSecurityGuard = (req, res, next) => {
     }
   }
 
-  if (isLocalhost || isSameOrigin || hasValidApiKey) {
+  // Optional OIDC session. When OIDC is enabled, an authenticated session is a
+  // valid credential AND same-origin alone is no longer sufficient — otherwise
+  // the same-origin SPA would bypass the very login we just required. API keys
+  // and the localhost bypass keep working so programmatic/CI and local use are
+  // unaffected. When OIDC is disabled this collapses to the original behaviour.
+  const hasValidSession = oidcAuth.isAuthenticated(req);
+  const sameOriginAccepted = isSameOrigin && !oidcAuth.oidcEnabled;
+
+  if (isLocalhost || hasValidSession || hasValidApiKey || sameOriginAccepted) {
     return next();
   }
 
@@ -278,6 +291,11 @@ const apiSecurityGuard = (req, res, next) => {
     error: 'Access denied. This server\'s scan API is restricted to authorized requests.'
   });
 };
+
+// Optional OIDC auth routes (/auth/login, /auth/callback, /auth/logout).
+// No-op when OIDC is disabled. Registered before the /api guard so the login
+// flow itself is never gated.
+oidcAuth.registerRoutes(app, logger);
 
 // Apply security guard to all API routes (except public endpoints)
 app.use('/api', (req, res, next) => {
@@ -424,7 +442,15 @@ app.get('/api/status', (req, res) => {
     legalLink: process.env.LEGAL_LINK || null,
     forceRespectRobotsTxt,
     maxCrawlPages,
-    hasApiKeysConfigured: expectedApiKeys.length > 0
+    hasApiKeysConfigured: expectedApiKeys.length > 0,
+    auth: {
+      oidcEnabled: oidcAuth.oidcEnabled,
+      authenticated: oidcAuth.isAuthenticated(req),
+      user: oidcAuth.getUser(req),
+      providerName: oidcAuth.providerName,
+      loginUrl: '/auth/login',
+      logoutUrl: '/auth/logout'
+    }
   });
 });
 
@@ -830,6 +856,8 @@ function summariseConfig() {
     ['MAX_CRAWL_RATE_LIMIT',  isCrawlRateLimitEnabled ? String(crawlRateLimitMax) : '0 (rate limiting disabled)'],
     ['MAX_RATE_LIMIT',      isRateLimitEnabled ? String(rateLimitMax) : '0 (rate limiting disabled)'],
     ['NODE_ENV',            process.env.NODE_ENV || '(not set)'],
+    ['OIDC_ISSUER',         oidcAuth.oidcEnabled ? (process.env.OIDC_ISSUER || '(enabled via OIDC_ENABLED)') : '(not set — OIDC disabled)'],
+    ['OIDC_ALLOWED_GROUPS', process.env.OIDC_ALLOWED_GROUPS || '(not set — any authenticated user)'],
     ['OPEN_BROWSER',        process.env.OPEN_BROWSER || '(not set)'],
     ['PORT',                process.env.PORT || '3000 (default)'],
     ['RATE_LIMIT_WINDOW_SEC', String(limitWindowSec)],
@@ -840,18 +868,44 @@ function summariseConfig() {
   ];
 }
 
-app.listen(PORT, () => {
-  const url = `http://localhost:${PORT}`;
-  logger.info(`ClearLoad server running on ${url}`);
-
-  logger.debug('[INFO] Environment variables processed at startup:');
-  for (const [name, value] of summariseConfig()) {
-    logger.debug(`         ${name.padEnd(22)} = ${value}`);
+// Startup: validate OIDC config (abort loudly on misconfiguration, mirroring the
+// API-key validation above) and run OIDC discovery (a network round-trip) before
+// the port is bound, so that by the time requests arrive the provider is ready.
+async function start() {
+  if (oidcAuth.oidcEnabled) {
+    try {
+      oidcAuth.validateConfig();
+    } catch (err) {
+      logger.error(`========================================================================`);
+      logger.error(`CRITICAL CONFIGURATION ERROR: ${err.message}`);
+      logger.error(`Server startup aborted.`);
+      logger.error(`========================================================================`);
+      process.exit(1);
+    }
+    try {
+      await oidcAuth.init(logger);
+    } catch (err) {
+      logger.error(`[ERROR] OIDC discovery failed for issuer "${process.env.OIDC_ISSUER}": ${err.message}`);
+      logger.error(`Server startup aborted. Verify OIDC_ISSUER is reachable and correct.`);
+      process.exit(1);
+    }
   }
 
-  if (process.env.OPEN_BROWSER === 'true' && process.env.NODE_ENV !== 'production') {
-    open(url).catch(() => {
-      // Fail silently if browser cannot be opened automatically
-    });
-  }
-});
+  app.listen(PORT, () => {
+    const url = `http://localhost:${PORT}`;
+    logger.info(`ClearLoad server running on ${url}`);
+
+    logger.debug('[INFO] Environment variables processed at startup:');
+    for (const [name, value] of summariseConfig()) {
+      logger.debug(`         ${name.padEnd(22)} = ${value}`);
+    }
+
+    if (process.env.OPEN_BROWSER === 'true' && process.env.NODE_ENV !== 'production') {
+      open(url).catch(() => {
+        // Fail silently if browser cannot be opened automatically
+      });
+    }
+  });
+}
+
+start();

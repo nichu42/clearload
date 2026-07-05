@@ -32,6 +32,16 @@
                     <span class="logo-emoji">🫧</span>
                     <span>Clear<strong>Load</strong></span>
                 </a>
+                <!-- OIDC auth controls (hidden unless OIDC is enabled on the server) -->
+                <div class="auth-controls hidden" id="authControls">
+                    <div class="auth-user hidden" id="authUserMenu">
+                        <i class="fa-solid fa-user-circle"></i>
+                        <span id="authUserName"></span>
+                        <button type="button" class="auth-logout-btn" id="logoutBtn" title="Sign out">
+                            <i class="fa-solid fa-right-from-bracket"></i> Sign out
+                        </button>
+                    </div>
+                </div>
             </header>
 
             <!-- Hero / Input Section -->
@@ -43,6 +53,18 @@
                         network requests, and GDPR compliance risks—captured in
                         real-time on initial page load before consent.
                     </p>
+
+                    <!-- Sign-in gate (shown only when OIDC is enabled and the
+                         user is not authenticated). Hides the scan UI below. -->
+                    <div class="auth-gate glass-card hidden" id="authGate">
+                        <i class="fa-solid fa-lock auth-gate-icon"></i>
+                        <h3>Sign in to run audits</h3>
+                        <p>This ClearLoad instance requires authentication. Sign in with your identity provider to continue.</p>
+                        <button type="button" class="primary-btn" id="loginBtn">
+                            <span>Sign in with Authentik</span>
+                            <i class="fa-solid fa-arrow-right"></i>
+                        </button>
+                    </div>
 
                     <!-- Input Bar -->
                     <div class="search-container">

@@ -107,12 +107,12 @@ Because this project automatically publishes public, pre-built container images,
 * **Codeberg Registry:** `codeberg.org/nichu42/clearload:latest`
 * **Port:** `3000`
 
-No registry account or authentication is required to pull these public images.
+No registry account or authentication is required to pull these public images. The published images are multi-arch manifests supporting both **`linux/amd64`** and **`linux/arm64`** (Apple silicon, Ampere, Raspberry Pi-class servers); your host's architecture is selected automatically on pull.
 
 ### 2. Build and Deploy from Git
 If you want to build the container from source directly:
 1. Paste the public repository HTTP clone URL into your hosting platform's Git import tool.
-2. The platform will automatically detect the `Dockerfile` in the root, build the `linux/amd64` container, and run it on port `3000`.
+2. The platform will automatically detect the `Dockerfile` in the root and build the container for your host architecture (`linux/amd64` or `linux/arm64`), then run it on port `3000`. The release pipeline (`.forgejo/workflows/release.yml`) publishes a multi-arch manifest for both.
 
 ---
 
@@ -152,9 +152,19 @@ When deploying ClearLoad on public Internet servers, you can configure security 
 | `MAX_CRAWL_PAGES` | Maximum pages allowed per crawl. Set `0` to disable crawls entirely, or `-1` for unlimited. (Exempts localhost/API keys). | `50` |
 | `MAX_CRAWL_RATE_LIMIT` | Maximum crawl requests per IP in the rate-limit window. Set `0` to disable. | `1` |
 | `MAX_RATE_LIMIT` | Maximum single-page scans per IP in the rate-limit window. Set `0` to disable. | `3` |
+| `OIDC_ISSUER` | OIDC provider issuer URL. **Setting this enables optional Single Sign-On** (see [OIDC section](#-single-sign-on-oidc--authentik)). For Authentik: `https://<authentik-host>/application/o/<app-slug>/`. | *Not set* (OIDC disabled) |
+| `OIDC_CLIENT_ID` | OIDC client ID from your provider. Required when OIDC is enabled. | *Not set* |
+| `OIDC_CLIENT_SECRET` | OIDC client secret from your provider. Required when OIDC is enabled. | *Not set* |
+| `OIDC_REDIRECT_URI` | Callback URL registered with the provider. | Derived from `TRUSTED_HOST`/request as `<origin>/auth/callback` |
+| `OIDC_SCOPES` | Space-separated scopes requested at login. | `openid profile email` |
+| `OIDC_ALLOWED_GROUPS` | Comma-separated group names; if set, only users in at least one group may sign in (matched against the `groups` claim). | *Not set* (any authenticated user) |
+| `OIDC_PROVIDER_NAME` | Display name shown on the sign-in button (e.g. "Sign in with Authentik"). | `Authentik` |
+| `OIDC_POST_LOGOUT_REDIRECT_URI` | Where the provider redirects after RP-initiated logout. | *Not set* |
+| `OIDC_SESSION_MAX_AGE_SEC` | Lifetime of the signed session cookie in seconds. | `28800` (8 hours) |
 | `OPEN_BROWSER` | Set `true` to auto-open the app in the default browser at startup (disabled in production or remote hosting). | *Not set* |
 | `PORT` | The port the Express server listens on. | `3000` |
 | `RATE_LIMIT_WINDOW_SEC` | Tracking window duration in seconds for IP rate limiting. | `900` (15 minutes) |
+| `SESSION_SECRET` | Secret used to sign the session cookie. **Required when OIDC is enabled** (min. 16 chars). | *Not set* |
 | `STATS_INTERVAL_MIN` | Aggregated scan stats logging interval in minutes. Set `0` to disable. | `0` (disabled) |
 | `TIMEOUT_CRAWL_SEC` | Timeout in seconds for an entire crawl job. If exceeded, returns results collected up to that point. | `300` (5 minutes) |
 | `TIMEOUT_SCAN_SEC` | Timeout in seconds for auditing a single page. Exceeding force-terminates the browser session for that page. | `90` (90 seconds) |
@@ -205,6 +215,37 @@ To generate a secure random 64-character hexadecimal key (using 32 random bytes)
   ```powershell
   $bytes = [Byte[]]::new(32); [System.Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($bytes); -join ($bytes | % { $_.ToString("x2") })
   ```
+
+### 🔑 Single Sign-On (OIDC / Authentik)
+
+ClearLoad supports **optional** OpenID Connect login so you can put the web UI behind your identity provider. It is **off by default** and only activates when `OIDC_ISSUER` is set — without it, nothing changes.
+
+The implementation is generic OIDC (Authorization Code flow with PKCE) and is tested against [Authentik](https://goauthentik.io/), our reference IdP.
+
+**How it coexists with existing access control:**
+* When OIDC is **enabled**, the web UI requires sign-in. The API endpoints (`/api/scan`, `/api/crawl`) accept a **valid session, a valid `x-api-key`, or a localhost request** — so programmatic/CI access via API keys keeps working unchanged. Same-origin requests *alone* no longer bypass auth (otherwise the login would be pointless).
+* When OIDC is **disabled**, behaviour is exactly as before (API key / same-origin / localhost).
+
+Sessions are **stateless**: identity is stored in a signed, `HttpOnly`, `SameSite=Lax` cookie (via `SESSION_SECRET`). There is no database or Redis to run.
+
+**Configuring Authentik:**
+1. In Authentik, create an **OAuth2/OpenID Provider** and an **Application** for ClearLoad.
+2. Set the provider's **Redirect URI** to `https://<your-clearload-host>/auth/callback`.
+3. Note the **Client ID** and **Client Secret**, and the issuer URL: `https://<authentik-host>/application/o/<app-slug>/`.
+4. *(Optional)* To use `OIDC_ALLOWED_GROUPS`, add a **Scope Mapping** that emits the `groups` claim and include it in the provider's scopes.
+
+**Minimal configuration:**
+```bash
+OIDC_ISSUER=https://authentik.example.com/application/o/clearload/
+OIDC_CLIENT_ID=<client-id>
+OIDC_CLIENT_SECRET=<client-secret>
+SESSION_SECRET=<random 32+ char string, e.g. `openssl rand -hex 32`>
+# Optional:
+OIDC_ALLOWED_GROUPS=clearload-users,admins
+OIDC_REDIRECT_URI=https://clearload.example.com/auth/callback
+```
+
+> The server performs OIDC discovery at startup and **aborts** if `OIDC_ISSUER` is unreachable or required variables are missing, so misconfiguration fails fast rather than silently.
 
 ---
 
