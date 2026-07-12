@@ -10,7 +10,7 @@ on:
 
 jobs:
   validate:
-    runs-on: codeberg-tiny
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4

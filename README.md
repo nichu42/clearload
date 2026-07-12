@@ -1,8 +1,8 @@
 # 🫧 ClearLoad
 
 <p align="left">
-  <a href="https://codeberg.org/nichu42/ClearLoad/releases"><img src="https://img.shields.io/badge/Version-0.6.0-007EC6?style=for-the-badge" alt="Version" /></a>&nbsp;
-  <a href="https://codeberg.org/nichu42/-/packages/container/clearload"><img src="https://img.shields.io/badge/Hosted_on-Codeberg-2185D0?style=for-the-badge&logo=gitea&logoColor=white" alt="Hosted on Codeberg" /></a>&nbsp;
+  <a href="https://github.com/nichu42/clearload/releases"><img src="https://img.shields.io/badge/Version-0.6.0-007EC6?style=for-the-badge" alt="Version" /></a>&nbsp;
+  <a href="https://github.com/nichu42/clearload/packages"><img src="https://img.shields.io/badge/Hosted_on-GitHub-181717?style=for-the-badge&logo=github&logoColor=white" alt="Hosted on GitHub" /></a>&nbsp;
   <a href="https://hub.docker.com/r/nichu42/clearload"><img src="https://img.shields.io/docker/pulls/nichu42/clearload?style=for-the-badge&logo=docker&logoColor=white" alt="Docker Pulls" /></a>&nbsp;
   <a href="https://clearload.42bit.io"><img src="https://img.shields.io/badge/Live_Demo-clearload.42bit.io-7C3AED?style=for-the-badge&logo=windowsterminal&logoColor=white" alt="Live Demo" /></a>&nbsp;
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-AGPL_v3-E74C3C?style=for-the-badge" alt="License: AGPL v3" /></a>&nbsp;
@@ -78,7 +78,7 @@ To classify cookies, identify outbound tracking, and recognize static CDNs, Clea
 * **`widget_mappings.json`**: Mappings of iframe sources to interactive widget names.
 * **`classification_rules.json`**: General heuristic matching rules for categorizing items.
 
-If you spot `Unknown` cookies or unclassified `Third-Party Connections` in your audit reports, you can help improve the scanner for everyone! Check our **[Dictionaries Guide](./dictionaries/README.md)** to add classifications directly on Codeberg with a few clicks. Every dictionary change is automatically checked by our built-in validation script.
+If you spot `Unknown` cookies or unclassified `Third-Party Connections` in your audit reports, you can help improve the scanner for everyone! Check our **[Dictionaries Guide](./dictionaries/README.md)** to add classifications directly on GitHub with a few clicks. Every dictionary change is automatically checked by our built-in validation script.
 
 ---
 
@@ -89,11 +89,11 @@ You can launch ClearLoad instantly without manually cloning the repository. Open
 
 * **Linux / macOS:**
   ```bash
-  curl -fsSL https://codeberg.org/nichu42/clearload/raw/branch/main/run.sh | bash
+  curl -fsSL https://raw.githubusercontent.com/nichu42/clearload/main/run.sh | bash
   ```
 * **Windows (PowerShell):**
   ```powershell
-  irm https://codeberg.org/nichu42/clearload/raw/branch/main/run.ps1 | iex
+  irm https://raw.githubusercontent.com/nichu42/clearload/main/run.ps1 | iex
   ```
 
 ---
@@ -104,7 +104,7 @@ You can launch ClearLoad instantly without manually cloning the repository. Open
 Because this project automatically publishes public, pre-built container images, you do not need to build the project from source or set up Git pipelines. You can deploy the app to any container hosting platform (like Bunny.net Magic Containers, Portainer, or Railway) by pointing it directly to:
 
 * **Docker Hub:** `nichu42/clearload:latest`
-* **Codeberg Registry:** `codeberg.org/nichu42/clearload:latest`
+* **GitHub Container Registry:** `ghcr.io/nichu42/clearload:latest`
 * **Port:** `3000`
 
 No registry account or authentication is required to pull these public images. The published images are multi-arch manifests supporting both **`linux/amd64`** and **`linux/arm64`** (Apple silicon, Ampere, Raspberry Pi-class servers); your host's architecture is selected automatically on pull.
@@ -258,7 +258,7 @@ OIDC_REDIRECT_URI=https://clearload.example.com/auth/callback
 ### Installation & Run
 1. Clone the repository and navigate to the directory:
    ```bash
-   git clone https://codeberg.org/nichu42/clearload.git
+   git clone https://github.com/nichu42/clearload.git
    cd clearload
    ```
 2. Install dependencies:

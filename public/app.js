@@ -1503,7 +1503,7 @@ document.addEventListener('DOMContentLoaded', () => {
           <strong>${escapeHtml(formattedBrand)}</strong> &bull; Privacy & Cookie Security Auditor
         </div>
         <div>
-          Copyright &copy; 2026 nichu42 and contributors &bull; Licensed under AGPL-3.0 &bull; codeberg.org/nichu42/ClearLoad
+          Copyright &copy; 2026 nichu42 and contributors &bull; Licensed under AGPL-3.0 &bull; github.com/nichu42/clearload
         </div>
       </div>
     `;
@@ -1757,7 +1757,7 @@ document.addEventListener('DOMContentLoaded', () => {
           <strong>${escapeHtml(formattedBrand)}</strong> &bull; Privacy & Cookie Security Auditor
         </div>
         <div>
-          Copyright &copy; 2026 nichu42 and contributors &bull; Licensed under AGPL-3.0 &bull; codeberg.org/nichu42/ClearLoad
+          Copyright &copy; 2026 nichu42 and contributors &bull; Licensed under AGPL-3.0 &bull; github.com/nichu42/clearload
         </div>
       </div>
     `;
@@ -2228,7 +2228,7 @@ document.addEventListener('DOMContentLoaded', () => {
           'Audit and classify all cookies set on page load. Block any non-essential cookies until the user explicitly consents.',
           'Configure session cookies with HttpOnly=true and Secure=true to protect against scripting and transmission vulnerabilities.',
           'Set SameSite to Lax or Strict to guard cookies against Cross-Site Request Forgery (CSRF).',
-          'Help the community keep cookie definitions accurate: if you recognize an unclassified cookie, add it to our <a href="https://codeberg.org/nichu42/ClearLoad/src/branch/main/dictionaries" target="_blank" rel="noopener noreferrer" style="color: var(--accent-color); font-weight: 600;">Codeberg Repository</a>.'
+          'Help the community keep cookie definitions accurate: if you recognize an unclassified cookie, add it to our <a href="https://github.com/nichu42/clearload/tree/main/dictionaries" target="_blank" rel="noopener noreferrer" style="color: var(--accent-color); font-weight: 600;">GitHub Repository</a>.'
         ]
       },
       {
@@ -2338,7 +2338,7 @@ document.addEventListener('DOMContentLoaded', () => {
           }
           recs.push('Self-host static resources (fonts, libraries, icons) directly on your own servers to prevent user IP address leakage.');
           recs.push('For third-party APIs and functional widgets (like translation tools or chatbots), defer loading their scripts and initializing connections until the user explicitly opts in.');
-          recs.push('Help grow our database: identify trackers or CDNs in this list and submit classifications to our <a href="https://codeberg.org/nichu42/ClearLoad/src/branch/main/dictionaries" target="_blank" rel="noopener noreferrer" style="color: var(--accent-color); font-weight: 600;">Codeberg Repository</a>.');
+                    recs.push('Help grow our database: identify trackers or CDNs in this list and submit classifications to our <a href="https://github.com/nichu42/clearload/tree/main/dictionaries" target="_blank" rel="noopener noreferrer" style="color: var(--accent-color); font-weight: 600;">GitHub Repository</a>.');
           return recs;
         }
       },
@@ -2910,7 +2910,7 @@ document.addEventListener('DOMContentLoaded', () => {
           <div class="cat-badge-container" style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
             <span class="cat-badge ${catClass}">${c.category}</span>
             ${c.category === 'Unknown' ? `
-              <a href="https://codeberg.org/nichu42/ClearLoad/src/branch/main/dictionaries" target="_blank" rel="noopener noreferrer" class="contrib-link" title="Help us classify this on Codeberg">
+              <a href="https://github.com/nichu42/clearload/tree/main/dictionaries" target="_blank" rel="noopener noreferrer" class="contrib-link" title="Help us classify this on GitHub">
                 <i class="fa-solid fa-code-fork"></i> Classify
               </a>
             ` : ''}
@@ -2997,7 +2997,7 @@ document.addEventListener('DOMContentLoaded', () => {
           <div class="cat-badge-container" style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
             <span class="cat-badge ${badgeClass}">${cleanCategory}</span>
             ${isUnclassifiedThirdParty ? `
-              <a href="https://codeberg.org/nichu42/ClearLoad/src/branch/main/dictionaries" target="_blank" rel="noopener noreferrer" class="contrib-link" title="Add this domain to our dictionaries on Codeberg">
+              <a href="https://github.com/nichu42/clearload/tree/main/dictionaries" target="_blank" rel="noopener noreferrer" class="contrib-link" title="Add this domain to our dictionaries on GitHub">
                 <i class="fa-solid fa-code-fork"></i> Contribute
               </a>
             ` : ''}

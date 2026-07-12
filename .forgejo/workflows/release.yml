@@ -7,7 +7,7 @@ on:
 
 jobs:
   build-and-deploy:
-    runs-on: codeberg-medium
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
@@ -33,12 +33,12 @@ jobs:
       - name: Build and Push Multi-Arch Manifest (amd64 + arm64)
         env:
           BUILDAH_ISOLATION: chroot
-          IMAGE: "codeberg.org/${{ github.repository_owner }}/clearload"
+          IMAGE: "ghcr.io/${{ github.repository_owner }}/clearload"
           TAG: "${{ github.ref_name }}"
         run: |
           # Configure buildah storage to use vfs inside the container to prevent hanging
           printf '[storage]\ndriver="vfs"\nrunroot="/run/containers/storage"\ngraphroot="/var/lib/containers/storage"\n' | tee /etc/containers/storage.conf
-          buildah login -u "${{ github.actor }}" -p "${{ secrets.PACKAGE_TOKEN }}" codeberg.org
+          buildah login -u "${{ github.actor }}" -p "${{ secrets.PACKAGE_TOKEN }}" ghcr.io
 
           # Build both architectures into a single local manifest list.
           # --jobs=1 builds arches sequentially to keep peak memory low (the

@@ -16,7 +16,7 @@ if (!(Get-Command node -ErrorAction SilentlyContinue)) {
 # Detect if we are outside the repo directory
 if (!(Test-Path "package.json")) {
     Write-Host "$bubble Repository not detected locally. Cloning ClearLoad..." -ForegroundColor Cyan
-    git clone https://codeberg.org/nichu42/clearload.git
+    git clone https://github.com/nichu42/clearload.git
     Set-Location clearload
 }
 

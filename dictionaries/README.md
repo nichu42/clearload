@@ -2,7 +2,7 @@
 
 Help make ClearLoad smarter! When ClearLoad scans a page and flags a resource or cookie as **"Unknown"** or a generic **"Third-Party Connection"**, you can help the community by adding its classification rule to this repository.
 
-No code experience is required to submit an update! You can do it directly on Codeberg in a few clicks.
+No code experience is required to submit an update! You can do it directly on GitHub in a few clicks.
 
 ---
 
@@ -46,12 +46,13 @@ Choose the file that matches the type of asset you want to classify:
 
 ---
 
-## 🚀 How to propose an addition on Codeberg
+## 🚀 How to propose an addition on GitHub
 
 You can submit your addition directly in your browser without setting up Git:
 
-1. Log in or create a free account on [Codeberg.org](https://codeberg.org).
-2. Click on the dictionary file you want to update (e.g. `tracking_patterns.json`).
+1. Sign in or create a free account on [GitHub](https://github.com).
+2. Navigate to the dictionaries folder in this repository: https://github.com/nichu42/clearload/tree/main/dictionaries
+3. Click the dictionary file you want to update (e.g. `tracking_patterns.json`).
 3. Click the **Edit File** button (pencil icon) in the top-right toolbar.
 4. Add your domain/mapping.
    > [!IMPORTANT]

@@ -12,7 +12,7 @@ fi
 # Detect if we are outside the repo directory
 if [ ! -f "package.json" ]; then
   echo "🫧 Repository not detected locally. Cloning ClearLoad..."
-  git clone https://codeberg.org/nichu42/clearload.git
+  git clone https://github.com/nichu42/clearload.git
   cd clearload
 fi
 
