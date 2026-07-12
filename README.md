@@ -112,7 +112,7 @@ No registry account or authentication is required to pull these public images. T
 ### 2. Build and Deploy from Git
 If you want to build the container from source directly:
 1. Paste the public repository HTTP clone URL into your hosting platform's Git import tool.
-2. The platform will automatically detect the `Dockerfile` in the root and build the container for your host architecture (`linux/amd64` or `linux/arm64`), then run it on port `3000`. The release pipeline (`.forgejo/workflows/release.yml`) publishes a multi-arch manifest for both.
+2. The platform will automatically detect the `Dockerfile` in the root and build the container for your host architecture (`linux/amd64` or `linux/arm64`), then run it on port `3000`. GitHub Actions automatically builds and pushes multi-arch images to Docker Hub on every release tag.
 
 ---
 
