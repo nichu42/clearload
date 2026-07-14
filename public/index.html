@@ -1969,8 +1969,15 @@
                         <p>
                             ClearLoad operates as a fully stateless service. We
                             do not store search history, audit reports, or
-                            visitor details in any database or file on disk. To
-                            prevent service abuse and protect resources, we
+                            visitor details in any database or file on disk. By
+                            default, this application does not set any cookies.
+                            If Single Sign-On (OIDC/SSO) is enabled by the
+                            administrator, a stateless, encrypted session cookie
+                            (<code>clearload_session</code>) is stored on your device
+                            solely to authenticate your login session.
+                        </p>
+                        <p>
+                            To prevent service abuse and protect resources, we
                             process client IP addresses transiently in-memory
                             (RAM) for rate limiting. This security data is
                             automatically discarded after 15 minutes and is

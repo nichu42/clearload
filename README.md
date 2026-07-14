@@ -325,7 +325,9 @@ Compliance with regulations such as the General Data Protection Regulation (GDPR
 This tool is provided "as is" without any warranty of any kind, either express or implied, including but not limited to warranties of accuracy, completeness, or fitness for a particular purpose. Under no circumstances shall the authors, contributors, or copyright holders be liable for any claims, damages, or other liability arising from your use of or reliance on the tool's findings.
 
 ### Privacy & Data Processing
-ClearLoad operates as a fully stateless service. We do not store search history, audit reports, or visitor details in any database or file on disk. To prevent service abuse and protect resources, we process client IP addresses transiently in-memory (RAM) for rate limiting. This security data is automatically discarded after 15 minutes and is never logged to disk or shared with third parties.
+ClearLoad operates as a fully stateless service. We do not store search history, audit reports, or visitor details in any database or file on disk. By default, this application does not set any cookies. If Single Sign-On (OIDC/SSO) is enabled by the administrator, a stateless, encrypted session cookie (`clearload_session`) is stored on your device solely to authenticate your login session.
+
+To prevent service abuse and protect resources, we process client IP addresses transiently in-memory (RAM) for rate limiting. This security data is automatically discarded after 15 minutes and is never logged to disk or shared with third parties.
 
 ### User Responsibility
 You are solely responsible for verifying the accuracy of the audit results and ensuring your website meets all applicable legal requirements. We strongly recommend consulting with a qualified legal professional to address your specific compliance needs.
