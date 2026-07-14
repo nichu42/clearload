@@ -352,5 +352,7 @@ ClearLoad is made possible by the following open-source software and libraries:
 * **[Helmet](https://helmetjs.github.io/)** (MIT License) - Security middleware that sets HTTP headers to protect against common web vulnerabilities.
 * **[Playwright](https://playwright.dev/)** (Apache 2.0 License) - Headless browser automation library.
 * **[open](https://github.com/sindresorhus/open)** (MIT License) - Cross-platform utility to open URLs in the default browser safely.
+* **[openid-client](https://github.com/panva/oauth4webapi)** (MIT License) - OpenID Connect (OIDC) client library for Single Sign-On integration.
+* **[cookie-session](https://github.com/expressjs/cookie-session)** (MIT License) - Cookie-based stateless session middleware for authentication.
 * **[FontAwesome Icons](https://fontawesome.com/)** (SIL OFL 1.1 / MIT / CC BY 4.0) - Modern vector icons, self-hosted locally to prevent third-party IP leakage.
 * **[Outfit](https://github.com/Outfitio/Outfit-Fonts)** & **[Plus Jakarta Sans](https://github.com/tokotype/PlusJakartaSans)** (SIL OFL 1.1) - Open-source typography designed by Rodrigo Fuenzalida and Tokotype, self-hosted locally for GDPR compliance.
