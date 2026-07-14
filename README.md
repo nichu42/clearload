@@ -82,7 +82,7 @@ To classify cookies, identify outbound tracking, and recognize static CDNs, Clea
 * **`widget_mappings.json`**: Mappings of iframe sources to interactive widget names.
 * **`classification_rules.json`**: General heuristic matching rules for categorizing items.
 
-If you spot `Unknown` cookies or unclassified `Third-Party Connections` in your audit reports, you can help improve the scanner for everyone! Check our **[Dictionaries Guide](./dictionaries/README.md)** to add classifications directly on GitHub with a few clicks. Every dictionary change is automatically checked by our built-in validation script.
+If you spot `Unknown` cookies or unclassified `Third-Party Connections` in your audit reports, you can help improve the scanner for everyone! Check our **[Dictionaries Guide](./dictionaries/README.md)** to add classifications directly on GitHub with a few clicks. Every dictionary change is automatically checked by our built-in validation script. If you are developing locally, please review the formatting and validation details in the **[Dictionary Contribution Guidelines](CONTRIBUTING.md#4-crowdsourced-dictionaries)**.
 
 ---
 
