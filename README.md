@@ -103,6 +103,7 @@ You can launch ClearLoad instantly without manually cloning the repository. Open
 Because this project automatically publishes public, pre-built container images, you do not need to build the project from source or set up Git pipelines. You can deploy the app to any container hosting platform (like Bunny.net Magic Containers, Portainer, or Railway) by pointing it directly to:
 
 * **Docker Hub:** `nichu42/clearload:latest`
+* **GitHub Packages (GHCR):** `ghcr.io/nichu42/clearload:latest`
 * **Port:** `3000`
 
 No registry account or authentication is required to pull these public images. The published images are multi-arch manifests supporting both **`linux/amd64`** and **`linux/arm64`** (Apple silicon, Ampere, Raspberry Pi-class servers); your host's architecture is selected automatically on pull.
@@ -110,7 +111,7 @@ No registry account or authentication is required to pull these public images. T
 ### 2. Build and Deploy from Git
 If you want to build the container from source directly:
 1. Paste the public repository HTTP clone URL into your hosting platform's Git import tool.
-2. The platform will automatically detect the `Dockerfile` in the root and build the container for your host architecture (`linux/amd64` or `linux/arm64`), then run it on port `3000`. GitHub Actions automatically builds and pushes multi-arch images to Docker Hub on every release tag.
+2. The platform will automatically detect the `Dockerfile` in the root and build the container for your host architecture (`linux/amd64` or `linux/arm64`), then run it on port `3000`. GitHub Actions automatically builds and pushes multi-arch images to Docker Hub and GitHub Container Registry (GHCR) on every release tag.
 
 ---
 
