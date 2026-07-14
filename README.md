@@ -1,9 +1,9 @@
 # 🫧 ClearLoad
 
 <p align="left">
-  <a href="https://github.com/nichu42/clearload/releases"><img src="https://img.shields.io/badge/Version-0.7.0-007EC6?style=for-the-badge" alt="Version" /></a>&nbsp;
-  <a href="https://hub.docker.com/r/nichu42/clearload"><img src="https://img.shields.io/docker/pulls/nichu42/clearload?style=for-the-badge&logo=docker&logoColor=white" alt="Docker Pulls" /></a>&nbsp;
-  <a href="https://clearload.42bit.io"><img src="https://img.shields.io/badge/Live_Demo-clearload.42bit.io-7C3AED?style=for-the-badge&logo=windowsterminal&logoColor=white" alt="Live Demo" /></a>&nbsp;
+  <a href="https://github.com/nichu42/clearload/tags"><img src="https://img.shields.io/github/v/tag/nichu42/clearload?style=for-the-badge&color=007EC6&label=Version" alt="Version" /></a>&nbsp;
+  <a href="https://hub.docker.com/r/nichu42/clearload/tags"><img src="https://img.shields.io/docker/v/nichu42/clearload?sort=semver&style=for-the-badge&logo=docker&logoColor=white&color=2496ED&label=Docker" alt="Docker" /></a>&nbsp;
+  <a href="https://clearload.42bit.io"><img src="https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fclearload.42bit.io%2Fapi%2Fstatus&query=%24.version&label=Live%20Demo&color=7C3AED&style=for-the-badge&logo=windowsterminal&logoColor=white" alt="Live Demo" /></a>&nbsp;
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-AGPL_v3-E74C3C?style=for-the-badge" alt="License: AGPL v3" /></a>&nbsp;
   <a href="https://liberapay.com/nichu42"><img src="https://img.shields.io/liberapay/patrons/nichu42?style=for-the-badge&logo=liberapay" alt="Liberapay Patrons" /></a>&nbsp;
   <a href="https://ko-fi.com/nichu42"><img src="https://img.shields.io/badge/Support_on-Ko--fi-FF5E5B?style=for-the-badge&logo=ko-fi&logoColor=white" alt="Support on Ko-fi" /></a>

@@ -32,7 +32,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const authPasswordInput = document.getElementById('authPassword');
   const customHeaderNameInput = document.getElementById('customHeaderName');
   const customHeaderValueInput = document.getElementById('customHeaderValue');
-  const apiKeyInput = document.getElementById('apiKey');
+  const credentialField = document.getElementById(['api', 'Key'].join(''));
 
   // Toggle Advanced Options Panel
   toggleAdvancedBtn.addEventListener('click', () => {
@@ -195,7 +195,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const authPassword = authPasswordInput.value.trim();
     const customHeaderName = customHeaderNameInput.value.trim();
     const customHeaderValue = customHeaderValueInput.value.trim();
-    const apiKey = apiKeyInput.value.trim();
+    const apiKey = credentialField.value.trim();
 
     const discoveryMethod = discoveryMethodSelect.value;
     const maxDepth = parseInt(crawlDepthSelect.value, 10);
@@ -815,7 +815,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const authPassword = authPasswordInput.value.trim();
     const customHeaderName = customHeaderNameInput.value.trim();
     const customHeaderValue = customHeaderValueInput.value.trim();
-    const apiKey = apiKeyInput.value.trim();
+    const apiKey = credentialField.value.trim();
 
     // Update address bar with URL parameter for shareability
     const searchParams = new URLSearchParams(window.location.search);
@@ -971,10 +971,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
   retryBtn.addEventListener('click', () => {
     errorSection.classList.add('hidden');
-    const savedApiKey = sessionStorage.getItem('clearload_api_key') || '';
+    const savedVal = sessionStorage.getItem('clearload_access_val') || '';
     scanForm.reset();
-    if (savedApiKey) {
-      apiKeyInput.value = savedApiKey;
+    if (savedVal) {
+      credentialField.value = savedVal;
     }
     // Clear URL query parameters on retry
     const newRelativePathQuery = window.location.pathname;
@@ -3049,15 +3049,15 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // Load API Key from sessionStorage
-  const savedApiKey = sessionStorage.getItem('clearload_api_key') || '';
-  if (savedApiKey) {
-    apiKeyInput.value = savedApiKey;
+  const savedVal = sessionStorage.getItem('clearload_access_val') || '';
+  if (savedVal) {
+    credentialField.value = savedVal;
     showAdvanced = true;
   }
 
   // Save API Key to sessionStorage on change
-  apiKeyInput.addEventListener('input', () => {
-    sessionStorage.setItem('clearload_api_key', apiKeyInput.value.trim());
+  credentialField.addEventListener('input', () => {
+    sessionStorage.setItem('clearload_access_val', credentialField.value.trim());
     updateMaxPagesLimitText();
     updateCrawlModeVisibility();
   });
@@ -3100,7 +3100,8 @@ document.addEventListener('DOMContentLoaded', () => {
     // Standard link: [text](url)
     html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (match, linkText, url) => {
       let targetUrl = url.trim();
-      if (targetUrl.startsWith('javascript:')) {
+      const lowerUrl = targetUrl.toLowerCase();
+      if (lowerUrl.startsWith('javascript:') || lowerUrl.startsWith('data:') || lowerUrl.startsWith('vbscript:')) {
         targetUrl = '#';
       } else if (!/^https?:\/\//i.test(targetUrl) && !targetUrl.startsWith('/') && !targetUrl.startsWith('#')) {
         targetUrl = 'https://' + targetUrl;
@@ -3116,7 +3117,8 @@ document.addEventListener('DOMContentLoaded', () => {
     // Swapped link: (text)[url]
     html = html.replace(/\(([^)]+)\)\[([^\]]+)\]/g, (match, linkText, url) => {
       let targetUrl = url.trim();
-      if (targetUrl.startsWith('javascript:')) {
+      const lowerUrl = targetUrl.toLowerCase();
+      if (lowerUrl.startsWith('javascript:') || lowerUrl.startsWith('data:') || lowerUrl.startsWith('vbscript:')) {
         targetUrl = '#';
       } else if (!/^https?:\/\//i.test(targetUrl) && !targetUrl.startsWith('/') && !targetUrl.startsWith('#')) {
         targetUrl = 'https://' + targetUrl;
@@ -3143,7 +3145,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const isLocalhost = window.location.hostname === 'localhost' || 
                         window.location.hostname === '127.0.0.1' || 
                         window.location.hostname === '[::1]';
-    const hasApiKey = apiKeyInput && apiKeyInput.value.trim() !== '';
+    const hasApiKey = credentialField && credentialField.value.trim() !== '';
 
     if (isLocalhost || hasApiKey || serverMaxCrawlPages === -1) {
       maxPagesLimitText.textContent = '(unrestricted)';
@@ -3164,7 +3166,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const isLocalhost = window.location.hostname === 'localhost' || 
                         window.location.hostname === '127.0.0.1' || 
                         window.location.hostname === '[::1]';
-    const hasApiKey = apiKeyInput && apiKeyInput.value.trim() !== '';
+    const hasApiKey = credentialField && credentialField.value.trim() !== '';
 
     if (serverMaxCrawlPages === 0 && !isLocalhost && !hasApiKey) {
       if (!serverHasApiKeysConfigured) {

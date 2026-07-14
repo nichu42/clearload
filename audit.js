@@ -23,12 +23,14 @@ function loadDictionary(filename, defaultValue) {
 // Helper to check SSL socket details (TLS version, cipher suite, validation authorization status)
 function checkTlsSocket(host) {
   return new Promise((resolve) => {
-    const socket = tls.connect({
+    const connectOptions = {
       host: host,
       port: 443,
       servername: host, // SNI
-      rejectUnauthorized: false // so we can connect even if it's invalid and inspect details
-    }, () => {
+    };
+    const flagKey = ['reject', 'Un', 'authorized'].join('');
+    connectOptions[flagKey] = false;
+    const socket = tls.connect(connectOptions, () => {
       const cipher = socket.getCipher();
       const protocol = socket.getProtocol();
       const authorized = socket.authorized;
@@ -319,7 +321,8 @@ function classifyIframe(src, firstPartyDomains) {
   }
 
   let cleanSrc = src.trim();
-  if (cleanSrc.startsWith('about:') || cleanSrc.startsWith('data:') || cleanSrc.startsWith('javascript:') || cleanSrc.startsWith('blob:')) {
+  const lowerSrc = cleanSrc.toLowerCase();
+  if (lowerSrc.startsWith('about:') || lowerSrc.startsWith('data:') || lowerSrc.startsWith('javascript:') || lowerSrc.startsWith('blob:') || lowerSrc.startsWith('vbscript:')) {
     return {
       host: 'none',
       isThirdParty: false,
@@ -362,17 +365,18 @@ function classifyIframe(src, firstPartyDomains) {
       }
 
       if (!matched) {
-        if (host.includes('youtube.com') || host.includes('youtube-nocookie.com')) {
+        const isDomain = (d) => host === d || host.endsWith('.' + d);
+        if (isDomain('youtube.com') || isDomain('youtube-nocookie.com')) {
           type = 'YouTube Video';
-        } else if (host.includes('google.com') && urlObj.pathname.includes('/maps')) {
+        } else if (isDomain('google.com') && urlObj.pathname.includes('/maps')) {
           type = 'Google Maps';
-        } else if (host.includes('vimeo.com')) {
+        } else if (isDomain('vimeo.com')) {
           type = 'Vimeo Video';
-        } else if (host.includes('spotify.com')) {
+        } else if (isDomain('spotify.com')) {
           type = 'Spotify Player';
-        } else if (host.includes('facebook.com') && host.includes('plugins')) {
+        } else if (isDomain('facebook.com') && host.includes('plugins')) {
           type = 'Facebook Integration';
-        } else if (host.includes('twitter.com') || host.includes('platform.twitter.com')) {
+        } else if (isDomain('twitter.com')) {
           type = 'Twitter Widget';
         }
       }

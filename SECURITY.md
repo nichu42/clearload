@@ -4,6 +4,8 @@
 
 If you discover a security vulnerability in ClearLoad, please report it via email to **nichu42@42bit.email**. A PGP key is provided below if you wish to encrypt your report. **Do not open a public issue.**
 
+> The contact email and PGP key in this file are shared with other projects maintained by the same author. If in doubt about which project a report concerns, mention the affected project name in the subject line.
+
 Please include as much of the following as you can:
 
 - Type of issue (e.g., XSS, prototype pollution, path traversal, SSRF, RCE, authentication bypass)
