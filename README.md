@@ -65,6 +65,10 @@ Unlike commercial compliance tools that store historical scans in databases or c
   - Utilizes a global concurrency guard (`MAX_CONCURRENT_SCANS`) to prevent server overload, returning `503 Service Unavailable` if the maximum limit of parallel Playwright browser sessions is reached.
 - **Zero-Contact Local Self-Hosting UI Assets:** Self-hosts all frontend resources (including FontAwesome icons, Outfit fonts, and Plus Jakarta Sans fonts) locally from `node_modules` via the `/vendor/` endpoint to guarantee complete compliance and zero pre-consent IP leaks from the user's browser.
 - **Basic Auth & Custom HTTP Headers Support:** Allows providing basic authentication credentials and custom HTTP request header key-value pairs (to bypass WAFs or firewalls) when scanning protected staging or staging/development websites.
+- **OIDC/SSO (OpenID Connect) Authentication:**
+  - Includes an opt-in Single Sign-On (SSO) layer using Authorization Code flow with PKCE, compatible with generic OIDC identity providers (such as Authentik).
+  - Uses stateless, secure signed session cookies (`cookie-session`) to retain user authentication status without requiring server-side databases.
+  - Supports role-based access control via `OIDC_ALLOWED_GROUPS` to restrict scanner access to specific authorized user groups.
 
 ---
 
