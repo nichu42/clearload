@@ -1,7 +1,8 @@
 # 🫧 ClearLoad
 
 <p align="left">
-  <a href="https://github.com/nichu42/clearload/tags"><img src="https://img.shields.io/github/v/tag/nichu42/clearload?style=for-the-badge&color=007EC6&label=Version" alt="Version" /></a>&nbsp;
+  <a href="https://github.com/nichu42/clearload/releases"><img src="https://img.shields.io/github/v/tag/nichu42/clearload?style=for-the-badge&color=007EC6&label=Version" alt="Version" /></a>&nbsp;
+  <a href="https://github.com/nichu42/clearload/pkgs/container/clearload"><img src="https://img.shields.io/badge/GHCR-Package_Registry-24292F?style=for-the-badge&logo=github&logoColor=white" alt="GHCR" /></a>&nbsp;
   <a href="https://hub.docker.com/r/nichu42/clearload/tags"><img src="https://img.shields.io/docker/v/nichu42/clearload?sort=semver&style=for-the-badge&logo=docker&logoColor=white&color=2496ED&label=Docker" alt="Docker" /></a>&nbsp;
   <a href="https://clearload.42bit.io"><img src="https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fclearload.42bit.io%2Fapi%2Fstatus&query=%24.version&label=Live%20Demo&color=7C3AED&style=for-the-badge&logo=windowsterminal&logoColor=white" alt="Live Demo" /></a>&nbsp;
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-AGPL_v3-E74C3C?style=for-the-badge" alt="License: AGPL v3" /></a>&nbsp;
