@@ -553,8 +553,18 @@ export async function runAuditWithBrowser(browser, targetUrl, options = {}) {
       }
     }, SCAN_TIMEOUT_MS);
 
+    let osPlatform = 'Windows NT 10.0; Win64; x64';
+    if (process.platform === 'darwin') {
+      osPlatform = 'Macintosh; Intel Mac OS X 10_15_7';
+    } else if (process.platform === 'linux') {
+      osPlatform = 'X11; Linux x86_64';
+    }
+
+    const chromeVersion = browser.version();
+    const dynamicUserAgent = `Mozilla/5.0 (${osPlatform}) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${chromeVersion} Safari/537.36`;
+
     const contextOptions = {
-      userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+      userAgent: dynamicUserAgent,
       viewport: { width: 1280, height: 800 },
       ignoreHTTPSErrors: true
     };
