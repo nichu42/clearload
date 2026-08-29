@@ -20,7 +20,7 @@ Simply enter any URL, and ClearLoad launches a sandboxed headless browser to cap
 Under GDPR and the ePrivacy Directive, you cannot place non-essential cookies or establish external third-party connections before a visitor explicitly opts in. ClearLoad runs audits on the initial page load state to catch hidden tracking scripts, analytics trackers, and retargeting pixels that are running illegally.
 
 ### 2. Identify IP Address Leakage (Third-Party Connections)
-Connecting to any third-party domain before consent leaks the visitor's IP address, which is classified as Personal Data under GDPR. ClearLoad automatically flags all external connections (like loading trackers, custom widgets, or fonts from third-party servers) as compliance violations.
+Connecting to any third-party domain before consent leaks the visitor's IP address, which is classified as Personal Data under GDPR. ClearLoad automatically flags all external connections (like loading trackers, custom widgets, or fonts from third-party servers) as compliance violations. Read [why cookies are not the only problem](https://kuber.studio/cookie/).
 
 ### 3. Fully Stateless & Privacy-First Architecture
 Unlike commercial compliance tools that store historical scans in databases or charge based on page counts, ClearLoad is designed with a lightweight, stateless approach:
