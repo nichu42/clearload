@@ -4,8 +4,11 @@ FROM mcr.microsoft.com/playwright:v1.60.0-noble
 
 # Remove unused browsers and tools to reduce attack surface.
 # ClearLoad only needs Chromium headless shell + ffmpeg.
+# Ensure Node.js runtime receives the latest security patches from upstream package repo.
 RUN rm -rf /ms-playwright/firefox-* /ms-playwright/webkit-* /ms-playwright/chromium-[0-9]* \
     && npm uninstall -g yarn \
+    && apt-get update \
+    && apt-get install --only-upgrade -y nodejs \
     && apt-get remove -y git openssh-client \
     && apt-get autoremove -y \
     && rm -rf /var/lib/apt/lists/*

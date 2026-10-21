@@ -1,0 +1,2 @@
+- Crawler: detect broken links
+- Report missing sitemap.xml
