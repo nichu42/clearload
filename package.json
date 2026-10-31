@@ -1,6 +1,6 @@
 {
   "name": "clearload",
-  "version": "0.7.5",
+  "version": "0.7.6",
   "description": "ClearLoad: Stateless website privacy & cookie security auditor utilizing Playwright and Express",
   "main": "server.js",
   "type": "module",
