@@ -1,6 +1,6 @@
 # Use the official Microsoft Playwright image as the base.
 # It includes Node.js, Chromium, and all system libraries required for headless browser automation.
-FROM mcr.microsoft.com/playwright:v1.60.0-noble
+FROM mcr.microsoft.com/playwright:v1.64.1-noble
 
 # Remove unused browsers and tools to reduce attack surface.
 # ClearLoad only needs Chromium headless shell + ffmpeg.
