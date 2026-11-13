@@ -453,12 +453,33 @@ function classifyRequest(requestUrl, pageDomain) {
 
 const SCAN_TIMEOUT_MS = (parseInt(process.env.TIMEOUT_SCAN_SEC, 10) || 90) * 1000;
 
-function safeCloseBrowser(browser) {
-  if (!browser) return Promise.resolve();
-  return Promise.race([
-    browser.close(),
-    new Promise(resolve => setTimeout(resolve, 5000))
-  ]).catch(() => {});
+/**
+ * Close a Playwright browser instance with a bounded timeout, force-killing
+ * the underlying process if graceful shutdown hangs so no Chromium process
+ * lingers at idle.
+ */
+export async function safeCloseBrowser(browser) {
+  if (!browser) return;
+  let timer;
+  try {
+    await Promise.race([
+      browser.close(),
+      new Promise((_, reject) => {
+        timer = setTimeout(() => reject(new Error('Browser close timeout')), 5000);
+      })
+    ]);
+  } catch {
+    try {
+      const proc = typeof browser.process === 'function' ? browser.process() : null;
+      if (proc && !proc.killed) {
+        proc.kill('SIGKILL');
+      }
+    } catch {
+      // Ignore kill errors
+    }
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 

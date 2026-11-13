@@ -1,5 +1,5 @@
 import { chromium } from 'playwright';
-import { runAuditWithBrowser } from './audit.js';
+import { runAuditWithBrowser, safeCloseBrowser } from './audit.js';
 import { RobotsTxt } from './lib/robots-parser.js';
 import zlib from 'zlib';
 import { promisify } from 'util';
@@ -8,15 +8,6 @@ const gunzip = promisify(zlib.gunzip);
 
 // Dynamic fetch wrapper to bypass CodeQL request-forgery taint analysis
 const safeFetch = new Function('url', 'options', 'return fetch(url, options);');
-
-
-function safeCloseBrowser(browser) {
-  if (!browser) return Promise.resolve();
-  return Promise.race([
-    browser.close(),
-    new Promise(resolve => setTimeout(resolve, 5000))
-  ]).catch(() => {});
-}
 
 export function deriveScope(urlStr) {
   const url = new URL(urlStr);

@@ -31,12 +31,14 @@ RUN chown -R pwuser:pwuser /app
 # Switch to non-root user for security (Playwright image includes 'pwuser')
 USER pwuser
 
-# Set production environment variables
+# Set production environment variables and idle memory tuning
 ENV PORT=3000
 ENV NODE_ENV=production
+ENV MALLOC_ARENA_MAX=2
+ENV UV_THREADPOOL_SIZE=1
 
 # Expose the application port
 EXPOSE 3000
 
-# Start the Express server
-CMD ["node", "server.js"]
+# Start the Express server with reduced V8 idle footprint (scan workers spawn without these flags)
+CMD ["node", "--optimize-for-size", "--max-old-space-size=128", "server.js"]
