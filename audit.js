@@ -453,26 +453,49 @@ function classifyRequest(requestUrl, pageDomain) {
 
 const SCAN_TIMEOUT_MS = (parseInt(process.env.TIMEOUT_SCAN_SEC, 10) || 90) * 1000;
 
+const BROWSER_LAUNCH_OPTIONS = {
+  headless: true,
+  args: [
+    '--no-sandbox',
+    '--disable-setuid-sandbox',
+    '--disable-dev-shm-usage',
+    '--disable-web-security'
+  ]
+};
+
 /**
- * Close a Playwright browser instance with a bounded timeout, force-killing
- * the underlying process if graceful shutdown hangs so no Chromium process
- * lingers at idle.
+ * Close a Playwright browser / BrowserServer with a bounded timeout,
+ * force-killing the underlying Chromium process group if graceful shutdown
+ * hangs so no Chromium process lingers.
  */
-export async function safeCloseBrowser(browser) {
-  if (!browser) return;
+export async function safeCloseBrowser(browser, browserServer = null) {
+  if (!browser && !browserServer) return;
   let timer;
   try {
     await Promise.race([
-      browser.close(),
+      (async () => {
+        if (browser) {
+          await browser.close().catch(() => {});
+        }
+        if (browserServer) {
+          await browserServer.close();
+        }
+      })(),
       new Promise((_, reject) => {
         timer = setTimeout(() => reject(new Error('Browser close timeout')), 5000);
       })
     ]);
   } catch {
     try {
-      const proc = typeof browser.process === 'function' ? browser.process() : null;
-      if (proc && !proc.killed) {
-        proc.kill('SIGKILL');
+      if (browserServer && typeof browserServer.kill === 'function') {
+        await browserServer.kill();
+      } else {
+        const proc = browserServer && typeof browserServer.process === 'function'
+          ? browserServer.process()
+          : (browser && typeof browser.process === 'function' ? browser.process() : null);
+        if (proc && !proc.killed) {
+          proc.kill('SIGKILL');
+        }
       }
     } catch {
       // Ignore kill errors
@@ -480,6 +503,33 @@ export async function safeCloseBrowser(browser) {
   } finally {
     clearTimeout(timer);
   }
+}
+
+/**
+ * Launch a Playwright BrowserServer and connect a Browser client so forced
+ * cleanup retains a real process handle (`browserServer.kill()`).
+ */
+export async function launchManagedBrowser() {
+  const browserServer = await chromium.launchServer(BROWSER_LAUNCH_OPTIONS);
+  let browser;
+  try {
+    browser = await chromium.connect(browserServer.wsEndpoint());
+  } catch (err) {
+    await safeCloseBrowser(null, browserServer);
+    throw err;
+  }
+
+  let closePromise = null;
+  return {
+    browser,
+    browserServer,
+    close: () => {
+      if (!closePromise) {
+        closePromise = safeCloseBrowser(browser, browserServer);
+      }
+      return closePromise;
+    }
+  };
 }
 
 
@@ -1369,21 +1419,13 @@ export async function runAuditWithBrowser(browser, targetUrl, options = {}) {
 }
 
 export async function runAudit(targetUrl, options = {}) {
-  let browser;
+  let managedBrowser;
   try {
-    browser = await chromium.launch({
-      headless: true,
-      args: [
-        '--no-sandbox',
-        '--disable-setuid-sandbox',
-        '--disable-dev-shm-usage',
-        '--disable-web-security'
-      ]
-    });
-    return await runAuditWithBrowser(browser, targetUrl, options);
+    managedBrowser = await launchManagedBrowser();
+    return await runAuditWithBrowser(managedBrowser.browser, targetUrl, options);
   } finally {
-    if (browser) {
-      await safeCloseBrowser(browser);
+    if (managedBrowser) {
+      await managedBrowser.close();
     }
   }
 }

@@ -1,5 +1,4 @@
-import { chromium } from 'playwright';
-import { runAuditWithBrowser, safeCloseBrowser } from './audit.js';
+import { launchManagedBrowser, runAuditWithBrowser } from './audit.js';
 import { RobotsTxt } from './lib/robots-parser.js';
 import zlib from 'zlib';
 import { promisify } from 'util';
@@ -447,6 +446,7 @@ export async function runCrawl(rootUrl, options = {}, progressCallback = () => {
     progressCallback({ event: 'page_discovered', data: { url: rootNorm, depth: 0 } });
   }
 
+  let managedBrowser;
   let browser;
   let cachedTlsResult = null;
   let cachedHttpFailed = false;
@@ -455,26 +455,17 @@ export async function runCrawl(rootUrl, options = {}, progressCallback = () => {
   try {
     if (options.signal) {
       abortListener = () => {
-        if (browser) {
-          safeCloseBrowser(browser);
+        if (managedBrowser) {
+          managedBrowser.close();
         }
       };
       options.signal.addEventListener('abort', abortListener);
     }
-    browser = await chromium.launch({
-      headless: true,
-      args: [
-        '--no-sandbox',
-        '--disable-setuid-sandbox',
-        '--disable-dev-shm-usage',
-        '--disable-web-security'
-      ]
-    });
+    managedBrowser = await launchManagedBrowser();
+    browser = managedBrowser.browser;
 
     if (options.signal?.aborted) {
-      if (browser) {
-        await safeCloseBrowser(browser);
-      }
+      await managedBrowser.close();
       throw new Error('Canceled');
     }
 
@@ -763,8 +754,8 @@ export async function runCrawl(rootUrl, options = {}, progressCallback = () => {
     if (options.signal && abortListener) {
       options.signal.removeEventListener('abort', abortListener);
     }
-    if (browser) {
-      await safeCloseBrowser(browser);
+    if (managedBrowser) {
+      await managedBrowser.close();
     }
   }
 
