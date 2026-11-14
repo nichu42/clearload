@@ -4,12 +4,10 @@ import fs from 'fs';
 import { fileURLToPath } from 'url';
 import rateLimit from 'express-rate-limit';
 import helmet from 'helmet';
-import { runAudit } from './audit.js';
-import { runCrawl } from './crawl.js';
+import { runAuditInWorker, runCrawlInWorker, shutdownWorkers } from './lib/worker-runner.js';
 import { validateAndNormalizeUrl, isPrivateIP } from './lib/ssrf-guard.js';
 import { RobotsTxt } from './lib/robots-parser.js';
 import * as oidcAuth from './lib/oidc-auth.js';
-import open from 'open';
 import dns from 'dns';
 import crypto from 'crypto';
 
@@ -492,7 +490,13 @@ app.get('/api/status', (req, res) => {
 });
 
 // API Dictionaries endpoint
+let cachedDictionariesJson = null;
+
 app.get('/api/dictionaries', (req, res) => {
+  if (cachedDictionariesJson && process.env.NODE_ENV === 'production') {
+    return res.type('application/json').send(cachedDictionariesJson);
+  }
+
   const dictionaries = [
     { name: 'cmp_mapping', file: 'cmp_mapping.json' },
     { name: 'tracking_patterns', file: 'tracking_patterns.json' },
@@ -522,8 +526,13 @@ app.get('/api/dictionaries', (req, res) => {
       error: `Failed to load dictionaries: ${failedDicts.join(', ')}`
     });
   }
-  
-  res.json(result);
+
+  const serialized = JSON.stringify(result);
+  if (process.env.NODE_ENV === 'production') {
+    cachedDictionariesJson = serialized;
+  }
+
+  res.type('application/json').send(serialized);
 });
 
 // Scan endpoint
@@ -649,7 +658,7 @@ app.post('/api/scan', scanLimiter, async (req, res) => {
     activeScansCount++;
     stats.scansStarted++;
     logger.debug(`[DEBUG] Scan started (${activeScansCount}/${maxConcurrentScans})`);
-    const report = await runAudit(targetUrl, { authUsername, authPassword, customHeaderName, customHeaderValue, targetOrigin: validation.origin, targetHost: targetHostname });
+    const report = await runAuditInWorker(targetUrl, { authUsername, authPassword, customHeaderName, customHeaderValue, targetOrigin: validation.origin, targetHost: targetHostname });
     if (report.success) {
       stats.scansCompleted++;
       logger.debug(`[DEBUG] Scan completed (${activeScansCount}/${maxConcurrentScans})`);
@@ -830,7 +839,7 @@ app.post('/api/crawl', crawlLimiter, async (req, res) => {
       resolvedRespectRobotsTxt = respectRobotsTxt === true || respectRobotsTxt === 'true';
     }
 
-    const result = await runCrawl(targetUrl, {
+    const result = await runCrawlInWorker(targetUrl, {
       discoveryMethod,
       maxDepth: depth,
       maxPages: pages,
@@ -986,7 +995,7 @@ async function start() {
     }
   }
 
-  app.listen(PORT, () => {
+  const server = app.listen(PORT, () => {
     const url = `http://localhost:${PORT}`;
     logger.info(`ClearLoad server running on ${url}`);
 
@@ -996,11 +1005,20 @@ async function start() {
     }
 
     if (process.env.OPEN_BROWSER === 'true' && process.env.NODE_ENV !== 'production') {
-      open(url).catch(() => {
-        // Fail silently if browser cannot be opened automatically
-      });
+      import('open')
+        .then(({ default: open }) => open(url))
+        .catch(() => {
+          // Fail silently if browser cannot be opened automatically
+        });
     }
   });
+
+  const handleShutdown = () => {
+    shutdownWorkers();
+    server.close(() => process.exit(0));
+  };
+  process.once('SIGTERM', handleShutdown);
+  process.once('SIGINT', handleShutdown);
 }
 
 start();
