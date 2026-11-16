@@ -11,7 +11,8 @@
     "start": "node server.js",
     "dev": "node server.js",
     "validate-dicts": "node scripts/validate-dictionaries.js",
-    "test": "npm run validate-dicts"
+    "validate-playwright": "node scripts/validate-playwright-image.js",
+    "test": "npm run validate-dicts && npm run validate-playwright"
   },
   "dependencies": {
     "@fontsource/outfit": "^5.3.0",
@@ -23,6 +24,6 @@
     "helmet": "^8.3.0",
     "open": "^11.0.4",
     "openid-client": "^6.8.9",
-    "playwright": "^1.65.0"
+    "playwright": "^1.65.1"
   }
 }
