@@ -1,4 +1,4 @@
-name: CI - Validate Dictionaries
+name: CI - Validate
 
 on:
   push:
@@ -24,5 +24,5 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Run Dictionary Validation
+      - name: Run Validation Checks
         run: npm test
