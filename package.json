@@ -20,10 +20,10 @@
     "@fortawesome/fontawesome-free": "^7.3.1",
     "cookie-session": "^2.1.1",
     "express": "^5.3.0",
-    "express-rate-limit": "^8.7.4",
+    "express-rate-limit": "^8.7.5",
     "helmet": "^8.3.0",
     "open": "^11.0.4",
-    "openid-client": "^6.8.9",
+    "openid-client": "^6.9.0",
     "playwright": "^1.65.1"
   }
 }
